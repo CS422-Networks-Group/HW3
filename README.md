@@ -58,7 +58,7 @@ Test order: for each destination, repetition *r* runs the algorithm list rotated
 (rep 1: dgcc, cubic, reno, bbr; rep 2: cubic, reno, bbr, dgcc; ...), so each algorithm runs in each position
 equally often. Every test's start time, position, and outcome is in `run_metadata.json`.
 
-### Outputs (`results/`)
+### Outputs (`results/`; PNG copies of the plots go to `report/figures/`)
 
 | file | contents |
 |---|---|
@@ -67,8 +67,8 @@ equally often. Every test's start time, position, and outcome is in `run_metadat
 | `summary.csv` | HW2 Q1(c): goodput min / median / mean / p95 (and srtt) per destination and algorithm |
 | `aggregate.csv` | goodput, srtt, and queueing-delay statistics per algorithm over all destinations and reps |
 | `run_metadata.json` | session, kernel, seed, destinations, test order, and every test attempted |
-| `goodput_timeseries.{pdf,png}` | HW2 Q1(c): goodput over time for every destination, run, and algorithm |
-| `tcp_stats_timeseries.{pdf,png}` | HW2 Q2(b)(i) for all four algorithms at the representative destination (median mean goodput) |
-| `tcp_stats_scatter.{pdf,png}` | HW2 Q2(b)(ii) for all four algorithms at the representative destination |
+| `goodput_<alg>.pdf` | HW2 Q1(c): goodput over time at every destination, one file per algorithm |
+| `tcp_stats_timeseries_<alg>.pdf` | HW2 Q2(b)(i) at the representative destination (median mean goodput) |
+| `tcp_stats_scatter_<alg>.pdf` | HW2 Q2(b)(ii) at the same destination |
 
 Percentiles use pandas' default linear interpolation between closest ranks (numpy `linear`, Hyndman–Fan type 7).

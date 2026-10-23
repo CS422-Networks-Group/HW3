@@ -398,95 +398,94 @@ def summarize(data: pd.DataFrame, algorithms, out: str):
     agg.round(3).to_csv(os.path.join(out, "aggregate.csv"))
     print(agg.round(2).T)
 
+#pdf to the output directory with the other results, png copy to report/figures for the report (as in HW2)
+FIGURES = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "report", "figures")
+
 def save(fig, out, name):
     fig.savefig(os.path.join(out, f"{name}.pdf"), bbox_inches="tight")
-    fig.savefig(os.path.join(out, f"{name}.png"), bbox_inches="tight", dpi=130)
+    os.makedirs(FIGURES, exist_ok=True)
+    fig.savefig(os.path.join(FIGURES, f"{name}.png"), bbox_inches="tight", dpi=130)
     plt.close(fig)
 
-#q2(b)(i) repeated for every algorithm: one column per algorithm, one row per metric, each row on one y scale
-def plot_timeseries(rep_data: pd.DataFrame, algorithms, out: str):
-    dest = rep_data["destination"].iloc[0]
-    fig, axes = plt.subplots(4, len(algorithms), figsize=(3.6 * len(algorithms), 10),
-                             sharex=True, sharey="row", squeeze=False)
-    reps = sorted(rep_data["rep"].unique())
-    for col, algorithm in enumerate(algorithms):
-        for rep in reps:
-            d = rep_data[(rep_data["algorithm"] == algorithm) & (rep_data["rep"] == rep)].sort_values("time_s")
-            if d.empty:
-                continue
-            color = plt.cm.tab10(rep - 1)
-            t = d["time_s"]
-            axes[0, col].plot(t, d["snd_cwnd_segs"], color=color, label=f"rep {rep}")
-            axes[1, col].plot(t, d["srtt_ms"], color=color)
-            axes[1, col].plot(t, d["min_rtt_ms"], "--", color=color, lw=0.8)
-            axes[2, col].plot(t, d["retrans_segs"], "o-", color=color, ms=3, lw=0.8)
-            axes[3, col].plot(t, d["goodput_bps"] / 1e6, color=color)
-        axes[0, col].set_title(algorithm, color=ALGORITHM_COLORS.get(algorithm, "black"), fontweight="bold")
-        axes[3, col].set_xlabel("time (s)")
-    axes[0, 0].set_ylabel("snd_cwnd (segments)")
-    axes[1, 0].set_ylabel("RTT (ms)\nsrtt solid, min_rtt dashed")
-    axes[2, 0].set_ylabel("retransmitted\nsegments / interval")
-    axes[3, 0].set_ylabel("goodput (Mbit/s)")
-    axes[0, -1].legend(loc="upper right", fontsize=8)
-    for ax in axes.flat:
+#q2(b) for one algorithm at the representative destination, one line per repetition;
+#lims holds axis ranges shared by every algorithm's figures so they can be compared directly
+def plot_tcp_stats(d_data: pd.DataFrame, algorithm: str, out: str, duration: float, lims: dict):
+    dest = d_data["destination"].iloc[0]
+
+    #(i) time series: cwnd, rtt, loss proxy, goodput
+    fig, axes = plt.subplots(4, 1, figsize=(8, 10), sharex=True)
+    for rep, d in d_data.groupby("rep"):
+        d = d.sort_values("time_s")
+        t, color = d["time_s"], plt.cm.tab10(rep - 1)
+        axes[0].plot(t, d["snd_cwnd_segs"], color=color, label=f"rep {rep}")
+        axes[1].plot(t, d["srtt_ms"], color=color)
+        axes[1].plot(t, d["min_rtt_ms"], "--", color=color, lw=0.8)
+        axes[2].plot(t, d["retrans_segs"], "o-", color=color, ms=3, lw=0.8)
+        axes[3].plot(t, d["goodput_bps"] / 1e6, color=color)
+    for ax, field, label in zip(axes, ["snd_cwnd_segs", "srtt_ms", "retrans_segs", "goodput_mbps"],
+                                ["snd_cwnd (segments)", "RTT (ms)\nsrtt solid, min_rtt dashed",
+                                 "retransmitted\nsegments / interval", "goodput (Mbit/s)"]):
+        ax.set_ylim(lims[field])
+        ax.set_ylabel(label)
         ax.grid(alpha=0.3)
-    fig.suptitle(f"TCP stats over time: {dest} (all algorithms, shared y scale per row)")
+    axes[0].legend(loc="upper right", fontsize=8)
+    axes[3].set_xlim(lims["time_s"])
+    axes[3].set_xlabel("time (s)")
+    fig.suptitle(f"TCP stats over time: {dest} ({algorithm})")
     fig.tight_layout()
-    save(fig, out, "tcp_stats_timeseries")
+    save(fig, out, f"tcp_stats_timeseries_{algorithm}")
 
-#q2(b)(ii) repeated for every algorithm: one row per algorithm, same x scale per column and same y scale everywhere
-def plot_scatter(rep_data: pd.DataFrame, algorithms, out: str, duration: float):
-    dest = rep_data["destination"].iloc[0]
-    fig, axes = plt.subplots(len(algorithms), 3, figsize=(13, 3.2 * len(algorithms)),
-                             sharex="col", sharey=True, squeeze=False, layout="constrained")
-    cols =[("snd_cwnd_segs", "snd_cwnd (segments)"), ("srtt_ms", "srtt (ms)"),
-            ("retrans_segs", "retransmitted segments / interval")]
-    for row, algorithm in enumerate(algorithms):
-        d = rep_data[rep_data["algorithm"] == algorithm]
-        for col, (field, label) in enumerate(cols):
-            ax = axes[row, col]
-            sc = ax.scatter(d[field], d["goodput_bps"] / 1e6, c=d["time_s"], cmap="viridis",
-                            vmin=0, vmax=duration, s=14)
-            ax.grid(alpha=0.3)
-            if row == len(algorithms) - 1:
-                ax.set_xlabel(label)
-        axes[row, 0].set_ylabel(f"{algorithm}\ngoodput (Mbit/s)", color=ALGORITHM_COLORS.get(algorithm, "black"),
-                                fontweight="bold")
-    fig.colorbar(sc, ax=axes, label="time (s)", shrink=0.5)
-    fig.suptitle(f"TCP stats vs goodput: {dest} (all repetitions, shared scales)")
-    save(fig, out, "tcp_stats_scatter")
-
-#q1(c): goodput over time for every destination, one panel each, every run colored by algorithm
-def plot_goodput(data: pd.DataFrame, algorithms, out: str):
-    dests = list(dict.fromkeys(data["destination"]))
-    fig, axes = plt.subplots(len(dests), 1, figsize=(10, 2.2 * len(dests)), sharex=True, sharey=True, squeeze=False)
-    for ax, dest in zip(axes[:, 0], dests):
-        for run_id, d in data[data["destination"] == dest].groupby("run_id"):
-            algorithm = d["algorithm"].iloc[0]
-            ax.plot(d["time_s"], d["goodput_bps"] / 1e6, color=ALGORITHM_COLORS.get(algorithm), lw=0.9, alpha=0.8,
-                    label=algorithm)
-        ax.set_title(dest, fontsize=9)
-        ax.set_ylabel("goodput (Mbit/s)")
+    #(ii) scatter: cwnd, rtt, loss signal vs goodput, colored by time
+    fig, axes = plt.subplots(1, 3, figsize=(14, 4.5), sharey=True)
+    for ax, field, label in zip(axes, ["snd_cwnd_segs", "srtt_ms", "retrans_segs"],
+                                ["snd_cwnd (segments)", "srtt (ms)", "retransmitted segments / interval"]):
+        sc = ax.scatter(d_data[field], d_data["goodput_bps"] / 1e6, c=d_data["time_s"], cmap="viridis",
+                        vmin=0, vmax=duration, s=18)
+        ax.set_xlim(lims[field])
+        ax.set_xlabel(label)
         ax.grid(alpha=0.3)
-    handles = {h.get_label(): h for h in axes[0, 0].get_lines()}
-    axes[0, 0].legend([handles[a] for a in algorithms if a in handles], [a for a in algorithms if a in handles],
-                      ncol=len(algorithms), fontsize=8, loc="upper right")
+    axes[0].set_ylim(lims["goodput_mbps"])
+    axes[0].set_ylabel("goodput (Mbit/s)")
+    fig.colorbar(sc, ax=axes, label="time (s)")
+    fig.suptitle(f"TCP stats vs goodput: {dest} ({algorithm}, all repetitions)")
+    save(fig, out, f"tcp_stats_scatter_{algorithm}")
+
+#q1(c): goodput over time at every destination for one algorithm, one line per repetition
+def plot_goodput(data: pd.DataFrame, algorithm: str, out: str, lims: dict):
+    a_data = data[data["algorithm"] == algorithm]
+    destinations = list(dict.fromkeys(data["destination"]))
+    fig, axes = plt.subplots(len(destinations), 1, figsize=(8, 2.5 * len(destinations)), sharex=True, squeeze=False,
+                             layout="constrained")
+    for ax, destination in zip(axes[:, 0], destinations):
+        for rep, d in a_data[a_data["destination"] == destination].groupby("rep"):
+            d = d.sort_values("time_s")
+            ax.plot(d["time_s"], d["goodput_bps"] / 1e6, color=plt.cm.tab10(rep - 1), label=f"rep {rep}")
+        ax.set_title(destination)
+        ax.set_ylabel("Mbit/s")
+        ax.set_ylim(lims["goodput_mbps"])
+        ax.grid(alpha=0.3)
+    axes[0, 0].legend(loc="lower right", fontsize=8)
+    axes[-1, 0].set_xlim(lims["time_s"])
     axes[-1, 0].set_xlabel("time (s)")
-    fig.suptitle("Goodput over time, all destinations and repetitions")
-    fig.tight_layout()
-    save(fig, out, "goodput_timeseries")
+    fig.suptitle(f"Goodput over time ({algorithm})")
+    save(fig, out, f"goodput_{algorithm}")
 
 def analyze(data: pd.DataFrame, algorithms, out: str, duration: float):
     algorithms = [a for a in algorithms if a in set(data["algorithm"])]
     summarize(data, algorithms, out)
-    plot_goodput(data, algorithms, out)
 
     #repeat the tcp stats plots for every algorithm at the same representative destination
     rep = pick_representative(data)
     print(f"representative destination: {rep}")
     rep_data = data[data["destination"] == rep]
-    plot_timeseries(rep_data, algorithms, out)
-    plot_scatter(rep_data, algorithms, out, duration)
+    lims = {"time_s": (0, data["time_s"].max()),
+            "goodput_mbps": (0, data["goodput_bps"].max() / 1e6 * 1.05),
+            "snd_cwnd_segs": (0, rep_data["snd_cwnd_segs"].max() * 1.05),
+            "retrans_segs": (0, max(rep_data["retrans_segs"].max(), 1) * 1.05),
+            "srtt_ms": (rep_data["min_rtt_ms"].min() * 0.95, rep_data["srtt_ms"].max() * 1.05)}
+    for algorithm in algorithms:
+        plot_goodput(data, algorithm, out, lims)
+        plot_tcp_stats(rep_data[rep_data["algorithm"] == algorithm], algorithm, out, duration, lims)
 
 #main test runner
 def main():
