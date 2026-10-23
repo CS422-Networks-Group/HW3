@@ -5,11 +5,16 @@ import ipaddress
 import json
 import os
 import platform
+import random
 import struct
 import time
+import matplotlib
+matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 
-DEFAULT_CONGESTION_ALGORITHMS = ("cubic", "reno", "bbr")
+#dgcc is the BPF struct_ops algorithm in bpf/dgcc.bpf.c; the others are the kernel's built-in modules
+DEFAULT_CONGESTION_ALGORITHMS = ("dgcc", "cubic", "reno", "bbr")
+ALGORITHM_COLORS = {"dgcc": "tab:red", "cubic": "tab:blue", "reno": "tab:green", "bbr": "tab:purple"}
 
 #linux struct tcp_info (include/uapi/linux/tcp.h), decoded up to tcpi_snd_wnd (232 bytes, kernel 5.4+)
 #8 u8 header fields, 24 u32, then the u64/u32 extensions in kernel order. "=" = native byte order, no padding
@@ -106,7 +111,8 @@ def set_congestion_control(sock, requested: str) -> str:
     except OSError as e:
         raise RuntimeError(
             f"congestion-control algorithm '{requested}' is unavailable: {e}. "
-            "Check /proc/sys/net/ipv4/tcp_available_congestion_control"
+            "Check /proc/sys/net/ipv4/tcp_available_congestion_control and "
+            "tcp_allowed_congestion_control (dgcc needs `sudo make -C bpf load`)"
         ) from e
     active = sock.getsockopt(socket.IPPROTO_TCP, socket.TCP_CONGESTION, 16).split(b"\0")[0].decode()
     if active != requested:
@@ -150,10 +156,10 @@ def run_test(server, port, experiment_time, interval, congestion_algorithm):
     if client.recv(1) != bytes([10]):
         raise RuntimeError("server rejected parameters")
 
-    #step 5: open a second connection to send data
+    #step 5: open a second connection to send data, with the requested congestion control set before connect
     new_client = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     new_client.settimeout(10)
-    algorithm = set_congestion_control(new_client, congestion_algorithm)
+    set_congestion_control(new_client, congestion_algorithm)
     new_client.connect((server, port))
     new_client.sendall(cookie)
 
@@ -173,6 +179,8 @@ def run_test(server, port, experiment_time, interval, congestion_algorithm):
             info = tcp_info(new_client)
             samples.append(tcp_sample(info, prev, time.time(), now - start, now - last_time))
             last_time, prev = now, info
+    #record the algorithm the established connection actually used, read back from the kernel after the transfer
+    algorithm = new_client.getsockopt(socket.IPPROTO_TCP, socket.TCP_CONGESTION, 16).split(b"\0")[0].decode()
 
     #step 8: send TEST_END (4), read EXCHANGE_RESULTS (13)
     client.sendall(bytes([4]))
@@ -203,12 +211,14 @@ def run_test(server, port, experiment_time, interval, congestion_algorithm):
 
     new_client.close()
     client.close()
+    if algorithm != congestion_algorithm:
+        raise RuntimeError(f"data socket ended on '{algorithm}', expected '{congestion_algorithm}'")
     return algorithm, samples
 
 
 def parse_args():
     parser = argparse.ArgumentParser(
-        description="iperf3-compatible goodput client"
+        description="iperf3-compatible client comparing dgcc (eBPF) with cubic, reno, and bbr"
     )
     parser.add_argument(
         "input_csv",
@@ -220,26 +230,44 @@ def parse_args():
     parser.add_argument(
         "--n",
         type=int,
-        default=10,
-        help="Number of destinations that must complete every requested algorithm (default: 10)",
+        default=5,
+        help="Number of destinations that must complete every repetition of every algorithm (default: 5)",
+    )
+    parser.add_argument(
+        "--reps",
+        type=int,
+        default=3,
+        help="repetitions of every algorithm per destination (default: 3)"
     )
     parser.add_argument(
         "--time",
         type=int,
-        default=60,
-        help="time to run each iperf3 test (default: 60s)"
+        default=10,
+        help="time to run each iperf3 test (default: 10s)"
     )
     parser.add_argument(
         "--interval",
         type=float,
-        default=1.0,
-        help="goodput sampling interval in seconds (default: 1.0)"
+        default=0.25,
+        help="goodput / tcp stats sampling interval in seconds (default: 0.25)"
     )
     parser.add_argument(
         "--max-attempts",
         type=int,
-        default=30,
-        help="max number of servers to try (default: 30)"
+        default=40,
+        help="max number of servers to try (default: 40)"
+    )
+    parser.add_argument(
+        "--retries",
+        type=int,
+        default=1,
+        help="extra tries for a failed test (e.g. server busy) before giving up on a destination (default: 1)"
+    )
+    parser.add_argument(
+        "--seed",
+        type=int,
+        default=None,
+        help="seed for the server shuffle (default: random; the value used is saved in run_metadata.json)"
     )
     parser.add_argument(
         "--out",
@@ -254,11 +282,52 @@ def parse_args():
     parser.add_argument(
         "--algorithms",
         nargs="+",
-        choices=DEFAULT_CONGESTION_ALGORITHMS,
         default=list(DEFAULT_CONGESTION_ALGORITHMS),
-        help="congestion-control algorithms to compare (default: cubic reno bbr)"
+        help="congestion-control algorithms to compare (default: dgcc cubic reno bbr)"
+    )
+    parser.add_argument(
+        "--replot",
+        action="store_true",
+        help="skip the measurements; rebuild the tables and plots from <out>/tcp_stats.csv"
     )
     return parser.parse_args()
+
+#test order for one repetition: the algorithm list rotated by one position per repetition, so every
+#algorithm runs first, second, ... equally often and slow drifts in path conditions do not favor one
+def rep_order(algorithms, rep):
+    k = (rep - 1) % len(algorithms)
+    return algorithms[k:] + algorithms[:k]
+
+#run every repetition of every algorithm against one destination; the destination only counts if all succeed
+def run_destination(ip, port, args, algorithms, session, server_attempt, attempts):
+    destination = f"{ip}:{port}"
+    rows = []
+    for rep in range(1, args.reps + 1):
+        for position, algorithm in enumerate(rep_order(algorithms, rep), start=1):
+            run_id = f"{session}-{server_attempt:02d}-r{rep}-{algorithm}"
+            for attempt in range(args.retries + 1):
+                started = time.time()
+                try:
+                    active_algorithm, samples = run_test(ip, port, args.time, args.interval, algorithm)
+                except (OSError, RuntimeError) as e:
+                    attempts.append({"run_id": run_id, "destination": destination, "rep": rep,
+                                     "position": position, "algorithm": algorithm, "start_unix_s": started,
+                                     "status": "failed", "error": str(e)})
+                    print(f"failed: {destination} rep {rep} ({algorithm}: {e})")
+                    #iperf3 servers accept one test at a time; give the previous one a moment to clear
+                    time.sleep(2)
+                    continue
+                for s in samples:
+                    rows.append({"run_id": run_id, "destination": destination, "rep": rep,
+                                 "position": position, "algorithm": active_algorithm, **s})
+                attempts.append({"run_id": run_id, "destination": destination, "rep": rep,
+                                 "position": position, "algorithm": active_algorithm, "start_unix_s": started,
+                                 "status": "ok"})
+                print(f"ok: {destination} rep {rep} #{position} ({active_algorithm})")
+                break
+            else:
+                return None
+    return rows
 
 #pick one shared destination whose algorithm-balanced mean goodput is the median across destinations
 def pick_representative(data: pd.DataFrame) -> str:
@@ -266,114 +335,216 @@ def pick_representative(data: pd.DataFrame) -> str:
              .groupby("destination").mean().sort_values())
     return means.index[(len(means) - 1) // 2]
 
-#q2(b): time series and scatter plots of tcp stats for one destination
-def plot_tcp_stats(d_data: pd.DataFrame, out: str):
-    d_data = d_data.sort_values("time_s")
-    dest, algorithm = d_data["destination"].iloc[0], d_data["algorithm"].iloc[0]
-    t = d_data["time_s"]
-    goodput = d_data["goodput_bps"] / 1e6
+#percentiles use pandas' default linear interpolation between the closest ranks (numpy "linear" / Hyndman-Fan 7)
+def q(p):
+    f = lambda s: s.quantile(p)
+    f.__name__ = f"p{int(p * 100)}"
+    return f
 
-    #(i) time series: cwnd, rtt, loss proxy, goodput
-    fig, axes = plt.subplots(4, 1, figsize=(8, 10), sharex=True)
-    axes[0].plot(t, d_data["snd_cwnd_segs"])
-    axes[0].set_ylabel("snd_cwnd (segments)")
-    axes[1].plot(t, d_data["srtt_ms"], label="srtt")
-    axes[1].fill_between(t, d_data["srtt_ms"] - d_data["rttvar_ms"], d_data["srtt_ms"] + d_data["rttvar_ms"],
-                         alpha=0.3, label="srtt ± rttvar")
-    axes[1].plot(t, d_data["min_rtt_ms"], "--", label="min_rtt")
-    axes[1].set_ylabel("RTT (ms)")
-    axes[1].legend(loc="upper right", fontsize=8)
-    axes[2].bar(t, d_data["retrans_segs"], width=d_data["interval_s"] * 0.8)
-    axes[2].set_ylabel("retransmitted\nsegments / interval")
-    axes[3].plot(t, goodput)
-    axes[3].set_ylabel("goodput (Mbit/s)")
-    axes[3].set_xlabel("time (s)")
-    fig.suptitle(f"TCP stats over time: {dest} ({algorithm})")
+#per-destination and per-algorithm throughput / rtt statistics
+def summarize(data: pd.DataFrame, algorithms, out: str) -> pd.DataFrame:
+    data = data.assign(goodput_mbps=data["goodput_bps"] / 1e6,
+                       queue_delay_ms=(data["srtt_ms"] - data["min_rtt_ms"]).clip(lower=0))
+
+    #per destination and algorithm, pooled over repetitions
+    summary = data.groupby(["destination", "algorithm"]).agg(
+        runs=("run_id", "nunique"),
+        goodput_min=("goodput_mbps", "min"), goodput_median=("goodput_mbps", "median"),
+        goodput_mean=("goodput_mbps", "mean"), goodput_p95=("goodput_mbps", q(0.95)),
+        srtt_median=("srtt_ms", "median"), srtt_mean=("srtt_ms", "mean"), srtt_p95=("srtt_ms", q(0.95)),
+        min_rtt=("min_rtt_ms", "min"), retrans_segs=("retrans_segs", "sum"))
+    summary["retrans_segs_per_run"] = summary.pop("retrans_segs") / summary["runs"]
+    summary.round(3).to_csv(os.path.join(out, "summary.csv"))
+
+    #per run: mean goodput, and goodput relative to the destination's cubic mean (removes the path's capacity)
+    runs = data.groupby(["run_id", "destination", "algorithm"]).agg(
+        goodput_mean=("goodput_mbps", "mean"), srtt_mean=("srtt_ms", "mean"),
+        queue_delay_mean=("queue_delay_ms", "mean"), retrans_segs=("retrans_segs", "sum"),
+        rto=("rto_backoffs", lambda s: int((s > 0).any()))).reset_index()
+    if "cubic" in algorithms:
+        cubic_mean = runs[runs["algorithm"] == "cubic"].groupby("destination")["goodput_mean"].mean()
+        runs["goodput_vs_cubic"] = runs["goodput_mean"] / runs["destination"].map(cubic_mean)
+    runs.round(4).to_csv(os.path.join(out, "runs.csv"), index=False)
+
+    #aggregate over all destinations and repetitions
+    agg = data.groupby("algorithm").agg(
+        samples=("goodput_mbps", "size"),
+        goodput_mean=("goodput_mbps", "mean"), goodput_std=("goodput_mbps", "std"),
+        goodput_p5=("goodput_mbps", q(0.05)), goodput_median=("goodput_mbps", "median"),
+        goodput_p95=("goodput_mbps", q(0.95)),
+        srtt_mean=("srtt_ms", "mean"), srtt_median=("srtt_ms", "median"), srtt_p95=("srtt_ms", q(0.95)),
+        queue_delay_mean=("queue_delay_ms", "mean"), queue_delay_median=("queue_delay_ms", "median"),
+        queue_delay_p95=("queue_delay_ms", q(0.95)),
+        retrans_rate_mean=("retrans_rate", "mean"))
+    by_run = runs.groupby("algorithm")
+    agg.insert(0, "runs", by_run.size())
+    agg["run_goodput_mean"] = by_run["goodput_mean"].mean()
+    agg["run_goodput_std"] = by_run["goodput_mean"].std()
+    agg["retrans_segs_per_run"] = by_run["retrans_segs"].mean()
+    agg["runs_with_rto"] = by_run["rto"].sum()
+    if "goodput_vs_cubic" in runs:
+        agg["goodput_vs_cubic_mean"] = by_run["goodput_vs_cubic"].mean()
+    agg = agg.reindex([a for a in algorithms if a in agg.index])
+    agg.round(3).to_csv(os.path.join(out, "aggregate.csv"))
+    print(agg.round(2).T)
+    return runs
+
+def save(fig, out, name):
+    fig.savefig(os.path.join(out, f"{name}.pdf"), bbox_inches="tight")
+    fig.savefig(os.path.join(out, f"{name}.png"), bbox_inches="tight", dpi=130)
+    plt.close(fig)
+
+#q2(b)(i) repeated for every algorithm: one column per algorithm, one row per metric, each row on one y scale
+def plot_timeseries(rep_data: pd.DataFrame, algorithms, out: str):
+    dest = rep_data["destination"].iloc[0]
+    fig, axes = plt.subplots(4, len(algorithms), figsize=(3.6 * len(algorithms), 10),
+                             sharex=True, sharey="row", squeeze=False)
+    reps = sorted(rep_data["rep"].unique())
+    for col, algorithm in enumerate(algorithms):
+        for rep in reps:
+            d = rep_data[(rep_data["algorithm"] == algorithm) & (rep_data["rep"] == rep)].sort_values("time_s")
+            if d.empty:
+                continue
+            color = plt.cm.tab10(rep - 1)
+            t = d["time_s"]
+            axes[0, col].plot(t, d["snd_cwnd_segs"], color=color, label=f"rep {rep}")
+            axes[1, col].plot(t, d["srtt_ms"], color=color)
+            axes[1, col].plot(t, d["min_rtt_ms"], "--", color=color, lw=0.8)
+            axes[2, col].plot(t, d["retrans_segs"], "o-", color=color, ms=3, lw=0.8)
+            axes[3, col].plot(t, d["goodput_bps"] / 1e6, color=color)
+        axes[0, col].set_title(algorithm, color=ALGORITHM_COLORS.get(algorithm, "black"), fontweight="bold")
+        axes[3, col].set_xlabel("time (s)")
+    axes[0, 0].set_ylabel("snd_cwnd (segments)")
+    axes[1, 0].set_ylabel("RTT (ms)\nsrtt solid, min_rtt dashed")
+    axes[2, 0].set_ylabel("retransmitted\nsegments / interval")
+    axes[3, 0].set_ylabel("goodput (Mbit/s)")
+    axes[0, -1].legend(loc="upper right", fontsize=8)
+    for ax in axes.flat:
+        ax.grid(alpha=0.3)
+    fig.suptitle(f"TCP stats over time: {dest} (all algorithms, shared y scale per row)")
     fig.tight_layout()
-    fig.savefig(os.path.join(out, f"tcp_stats_timeseries_{algorithm}.pdf"))
-    plt.close(fig)
+    save(fig, out, "tcp_stats_timeseries")
 
-    #(ii) scatter: cwnd, rtt, loss signal vs goodput, colored by time
-    fig, axes = plt.subplots(1, 3, figsize=(14, 4.5), sharey=True)
-    for ax, col, label in zip(axes, ["snd_cwnd_segs", "srtt_ms", "retrans_segs"],
-                              ["snd_cwnd (segments)", "srtt (ms)", "retransmitted segments / interval"]):
-        sc = ax.scatter(d_data[col], goodput, c=t, cmap="viridis", s=18)
-        ax.set_xlabel(label)
-    axes[0].set_ylabel("goodput (Mbit/s)")
-    fig.colorbar(sc, ax=axes, label="time (s)")
-    fig.suptitle(f"TCP stats vs goodput: {dest} ({algorithm})")
-    fig.savefig(os.path.join(out, f"tcp_stats_scatter_{algorithm}.pdf"), bbox_inches="tight")
-    plt.close(fig)
+#q2(b)(ii) repeated for every algorithm: one row per algorithm, same x scale per column and same y scale everywhere
+def plot_scatter(rep_data: pd.DataFrame, algorithms, out: str, duration: float):
+    dest = rep_data["destination"].iloc[0]
+    fig, axes = plt.subplots(len(algorithms), 3, figsize=(13, 3.2 * len(algorithms)),
+                             sharex="col", sharey=True, squeeze=False, layout="constrained")
+    cols =[("snd_cwnd_segs", "snd_cwnd (segments)"), ("srtt_ms", "srtt (ms)"),
+            ("retrans_segs", "retransmitted segments / interval")]
+    for row, algorithm in enumerate(algorithms):
+        d = rep_data[rep_data["algorithm"] == algorithm]
+        for col, (field, label) in enumerate(cols):
+            ax = axes[row, col]
+            sc = ax.scatter(d[field], d["goodput_bps"] / 1e6, c=d["time_s"], cmap="viridis",
+                            vmin=0, vmax=duration, s=14)
+            ax.grid(alpha=0.3)
+            if row == len(algorithms) - 1:
+                ax.set_xlabel(label)
+        axes[row, 0].set_ylabel(f"{algorithm}\ngoodput (Mbit/s)", color=ALGORITHM_COLORS.get(algorithm, "black"),
+                                fontweight="bold")
+    fig.colorbar(sc, ax=axes, label="time (s)", shrink=0.5)
+    fig.suptitle(f"TCP stats vs goodput: {dest} (all repetitions, shared scales)")
+    save(fig, out, "tcp_stats_scatter")
 
-
-def plot_goodput(data: pd.DataFrame, out: str, algorithm: str):
-    """Plot goodput over time for every destination using one congestion algorithm."""
-    algorithm_data = data[data["algorithm"] == algorithm]
-    destinations = algorithm_data["destination"].unique()
-    fig, axes = plt.subplots(len(destinations), 1, figsize=(8, 2.5 * len(destinations)), squeeze=False)
-    for ax, destination in zip(axes[:, 0], destinations):
-        d_data = algorithm_data[algorithm_data["destination"] == destination].sort_values("time_s")
-        ax.plot(d_data["time_s"], d_data["goodput_bps"] / 1e6)
-        ax.set_title(destination)
-        ax.set_ylabel("Mbit/s")
-    axes[-1, 0].set_xlabel("time (s)")
-    fig.suptitle(f"Goodput over time ({algorithm})")
+#aggregate comparison: per-destination mean goodput / srtt with error bars over repetitions,
+#and distributions of per-run normalized goodput and per-sample queueing delay
+def plot_aggregate(data: pd.DataFrame, runs: pd.DataFrame, algorithms, out: str):
+    dests = list(runs.groupby("destination")["goodput_mean"].mean().sort_values(ascending=False).index)
+    width = 0.8 / len(algorithms)
+    fig, axes = plt.subplots(2, 1, figsize=(max(8, 1.8 * len(dests)), 7), sharex=True)
+    for i, algorithm in enumerate(algorithms):
+        r = runs[runs["algorithm"] == algorithm].groupby("destination")
+        x = [j + (i - (len(algorithms) - 1) / 2) * width for j in range(len(dests))]
+        for ax, field in zip(axes, ["goodput_mean", "srtt_mean"]):
+            ax.bar(x, r[field].mean().reindex(dests), width, yerr=r[field].std().reindex(dests),
+                   capsize=2, label=algorithm, color=ALGORITHM_COLORS.get(algorithm))
+    axes[0].set_ylabel("mean goodput (Mbit/s)")
+    axes[1].set_ylabel("mean srtt (ms)")
+    axes[1].set_xticks(range(len(dests)), dests, rotation=20, ha="right")
+    axes[0].legend(ncol=len(algorithms), fontsize=8)
+    axes[0].set_title("Per-destination means over repetitions (error bar = std across runs)")
+    for ax in axes:
+        ax.grid(axis="y", alpha=0.3)
     fig.tight_layout()
-    fig.savefig(os.path.join(out, f"goodput_{algorithm}.pdf"))
-    plt.close(fig)
+    save(fig, out, "aggregate_by_destination")
+
+    fig, axes = plt.subplots(1, 2, figsize=(11, 4))
+    queue = (data["srtt_ms"] - data["min_rtt_ms"]).clip(lower=0)
+    if "goodput_vs_cubic" in runs:
+        axes[0].boxplot([runs.loc[runs["algorithm"] == a, "goodput_vs_cubic"] for a in algorithms],
+                        tick_labels=algorithms)
+        axes[0].axhline(1, color="gray", lw=0.8, ls="--")
+        axes[0].set_ylabel("run mean goodput / destination's cubic mean")
+    axes[1].boxplot([queue[data["algorithm"] == a] for a in algorithms], tick_labels=algorithms,
+                    showfliers=False)
+    axes[1].set_ylabel("queueing delay: srtt - min_rtt (ms)")
+    axes[0].set_title("Normalized goodput per run")
+    axes[1].set_title("Queueing delay per sample (outliers hidden)")
+    for ax in axes:
+        ax.grid(axis="y", alpha=0.3)
+    fig.tight_layout()
+    save(fig, out, "aggregate_boxplot")
+
+def analyze(data: pd.DataFrame, algorithms, out: str, representative: str | None, duration: float):
+    algorithms = [a for a in algorithms if a in set(data["algorithm"])]
+    runs = summarize(data, algorithms, out)
+    plot_aggregate(data, runs, algorithms, out)
+
+    #repeat the tcp stats plots for every algorithm at the same representative destination
+    rep = representative or pick_representative(data)
+    if rep not in set(data["destination"]):
+        print(f"representative {rep} has no samples, skipping tcp stats plots")
+        return
+    print(f"representative destination: {rep}")
+    rep_data = data[data["destination"] == rep]
+    plot_timeseries(rep_data, algorithms, out)
+    plot_scatter(rep_data, algorithms, out, duration)
 
 #main test runner
 def main():
     args = parse_args()
     # Preserve the requested order while preventing duplicate runs/plots.
     algorithms = list(dict.fromkeys(args.algorithms))
+    os.makedirs(args.out, exist_ok=True)
+    if args.replot:
+        meta_path = os.path.join(args.out, "run_metadata.json")
+        duration = json.load(open(meta_path))["time_s"] if os.path.exists(meta_path) else args.time
+        analyze(pd.read_csv(os.path.join(args.out, "tcp_stats.csv")), algorithms, args.out,
+                args.representative, duration)
+        return
     try:
         validate_congestion_algorithms(algorithms)
     except RuntimeError as e:
         raise SystemExit(f"error: {e}") from e
     df = process_csv(args.input_csv)
 
-    #try random servers until n complete all algorithms or we run out of attempts
+    #try random servers until n complete all repetitions of all algorithms or we run out of attempts
     session = time.strftime("%Y%m%dT%H%M%S")
+    seed = args.seed if args.seed is not None else random.randrange(2**32)
     rows = []
     attempts = []
-    successes = 0
-    for server_attempt, (_, row) in enumerate(df.sample(frac=1).head(args.max_attempts).iterrows(), start=1):
-        if successes == args.n:
+    destinations = []
+    for server_attempt, (_, row) in enumerate(df.sample(frac=1, random_state=seed).head(args.max_attempts).iterrows(),
+                                              start=1):
+        if len(destinations) == args.n:
             break
         ip, port = row["IP/HOST"], int(str(row["PORT"]).split("-")[0])
-        destination = f"{ip}:{port}"
-        destination_rows = []
-        destination_succeeded = True
-        for algorithm in algorithms:
-            run_id = f"{session}-{server_attempt:02d}-{algorithm}"
-            try:
-                active_algorithm, samples = run_test(ip, port, args.time, args.interval, algorithm)
-                for s in samples:
-                    destination_rows.append({"run_id": run_id, "destination": destination,
-                                             "algorithm": active_algorithm, **s})
-                attempts.append({"run_id": run_id, "destination": destination, "status": "ok",
-                                 "algorithm": active_algorithm})
-                print(f"ok: {destination} ({active_algorithm})")
-            except (OSError, RuntimeError) as e:
-                attempts.append({"run_id": run_id, "destination": destination, "status": "failed",
-                                 "algorithm": algorithm, "error": str(e)})
-                print(f"failed: {destination} ({algorithm}: {e})")
-                destination_succeeded = False
-                break
-        if destination_succeeded:
-            rows.extend(destination_rows)
-            successes += 1
-        elif destination_rows:
-            print(f"discarding incomplete destination: {destination}")
+        destination_rows = run_destination(ip, port, args, algorithms, session, server_attempt, attempts)
+        if destination_rows is None:
+            print(f"discarding incomplete destination: {ip}:{port}")
+            continue
+        rows.extend(destination_rows)
+        destinations.append(f"{ip}:{port}")
 
-    if successes < args.n:
-        print(f"shortfall: only {successes} of {args.n} servers succeeded")
+    if len(destinations) < args.n:
+        print(f"shortfall: only {len(destinations)} of {args.n} servers succeeded")
 
-    #record the run setup, host kernel, and every destination attempted
-    os.makedirs(args.out, exist_ok=True)
-    meta = {"session": session, "kernel": platform.release(), "requested": args.n, "succeeded": successes,
-            "algorithms": algorithms, "time_s": args.time, "interval_s": args.interval, "attempts": attempts}
+    #record the run setup, host kernel, test order, and every test attempted
+    meta = {"session": session, "kernel": platform.release(), "seed": seed, "requested": args.n,
+            "succeeded": len(destinations), "destinations": destinations, "algorithms": algorithms,
+            "reps": args.reps, "test_order": {rep: rep_order(algorithms, rep) for rep in range(1, args.reps + 1)},
+            "time_s": args.time, "interval_s": args.interval, "retries": args.retries, "attempts": attempts}
     with open(os.path.join(args.out, "run_metadata.json"), "w") as f:
         json.dump(meta, f, indent=2)
     if not rows:
@@ -382,34 +553,10 @@ def main():
     #save raw samples: full tcp stats, and the goodput-only view
     data = pd.DataFrame(rows)
     data.to_csv(os.path.join(args.out, "tcp_stats.csv"), index=False)
-    data[["run_id", "destination", "algorithm", "time_s", "goodput_bps"]].to_csv(
+    data[["run_id", "destination", "rep", "algorithm", "time_s", "goodput_bps"]].to_csv(
         os.path.join(args.out, "goodput.csv"), index=False)
 
-
-    #summary table (Mbit/s)
-    g = data.groupby(["destination", "algorithm"])["goodput_bps"]
-    summary = pd.DataFrame({"min": g.min(), "median": g.median(),
-                            "mean": g.mean(), "p95": g.quantile(0.95)}) / 1e6
-    summary.to_csv(os.path.join(args.out, "summary.csv"))
-    print(summary)
-
-    #repeat the goodput plot for each congestion-control algorithm
-    destinations = data["destination"].unique()
-    for algorithm in algorithms:
-        plot_goodput(data, args.out, algorithm)
-
-    #repeat the tcp stats plots for every algorithm at the same representative destination
-    rep = args.representative or pick_representative(data)
-    if rep not in destinations:
-        print(f"representative {rep} has no samples, skipping tcp stats plots")
-        return
-    print(f"representative destination: {rep}")
-    for algorithm in algorithms:
-        d_data = data[(data["destination"] == rep) & (data["algorithm"] == algorithm)]
-        if d_data.empty:
-            print(f"representative {rep} has no {algorithm} samples, skipping its tcp stats plots")
-            continue
-        plot_tcp_stats(d_data, args.out)
+    analyze(data, algorithms, args.out, args.representative, args.time)
 
 
 if __name__ == "__main__":
