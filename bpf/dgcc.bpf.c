@@ -71,9 +71,9 @@ enum {
 	ST_HOLD,		/* rounds skipped after a decrease */
 	ST_BDP_CAP,		/* cwnd clamped to 2 * BDP */
 	ST_UNDO,		/* spurious-loss undo */
-	NR_STATS,
+	ST_NR,
 };
-u64 dgcc_stats[NR_STATS] = {};
+u64 dgcc_stats[ST_NR] = {};
 
 #define STAT(i) __sync_fetch_and_add(&dgcc_stats[i], 1)
 
