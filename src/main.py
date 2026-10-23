@@ -357,10 +357,12 @@ def summarize(data: pd.DataFrame, algorithms, out: str) -> pd.DataFrame:
     summary.round(3).to_csv(os.path.join(out, "summary.csv"))
 
     #per run: mean goodput, and goodput relative to the destination's cubic mean (removes the path's capacity)
+    #a timeout shows as ca_state TCP_CA_Loss (4), or as nonzero RTO back-offs if the sample lands before recovery
+    data = data.assign(rto=((data["ca_state"] == 4) | (data["rto_backoffs"] > 0)).astype(int))
     runs = data.groupby(["run_id", "destination", "algorithm"]).agg(
         goodput_mean=("goodput_mbps", "mean"), srtt_mean=("srtt_ms", "mean"),
         queue_delay_mean=("queue_delay_ms", "mean"), retrans_segs=("retrans_segs", "sum"),
-        rto=("rto_backoffs", lambda s: int((s > 0).any()))).reset_index()
+        rto=("rto", "max")).reset_index()
     if "cubic" in algorithms:
         cubic_mean = runs[runs["algorithm"] == "cubic"].groupby("destination")["goodput_mean"].mean()
         runs["goodput_vs_cubic"] = runs["goodput_mean"] / runs["destination"].map(cubic_mean)

@@ -35,8 +35,7 @@ char _license[] SEC("license") = "GPL";
 #define BDP_CAP_MULT		2	/* cwnd <= 2 * max_bw * base_rtt */
 #define USEC_PER_SEC		1000000ULL
 
-/* TCP_CA_* states from include/net/tcp.h (not in vmlinux.h as an enum on every kernel) */
-#define CA_OPEN		0
+/* TCP_CA_Loss from include/uapi/linux/tcp.h (enum tcp_ca_state) */
 #define CA_LOSS		4
 
 /* Per-socket state, stored in icsk_ca_priv (at most ICSK_CA_PRIV_SIZE = 104 bytes). */
