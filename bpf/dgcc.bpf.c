@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0
 /*
  * dgcc: delay + goodput congestion control (CS 422 HW2 Q3(b) design), as a
- * BPF struct_ops tcp_congestion_ops for Linux 6.6.
+ * BPF struct_ops tcp_congestion_ops for Linux >= 6.6.
  *
  * Once per round trip the algorithm compares the smoothed RTT with the
  * fastest recent RTT ("extra delay"), checks for losses and timeouts, and
@@ -21,8 +21,8 @@
 char _license[] SEC("license") = "GPL";
 
 #define MIN_CWND		4	/* segments */
-#define MIN_INC			2	/* additive increase far below target -> MAX_INC */
-#define MAX_INC			8
+#define MIN_INC			2	/* additive increase near the delay target ... */
+#define MAX_INC			8	/* ... up to this with no extra delay */
 #define SLIGHT_INC		1	/* increase when the last one did not help goodput */
 #define LOSS_BIG_PCT		60	/* cwnd kept on loss with large extra delay */
 #define LOSS_SMALL_PCT		90	/* cwnd kept on loss with small extra delay */
@@ -55,26 +55,6 @@ struct dgcc {
 	u8 last_was_increase;		/* previous round ended with an additive increase */
 	u8 hold;			/* rounds to skip decisions after a decrease */
 };
-
-/* Global event counters, readable with `bpftool map dump name dgcc_bpf.bss`. */
-enum {
-	ST_INIT,		/* sockets initialized */
-	ST_ROUNDS,		/* rounds evaluated */
-	ST_TIMEOUT,		/* RTO -> reset to start-up */
-	ST_LOSS_BIG,		/* loss cut to 60% */
-	ST_LOSS_SMALL,		/* loss cut to 90% */
-	ST_STARTUP_EXIT,	/* start-up left because extra delay was noticeable */
-	ST_INC,			/* additive increase */
-	ST_INC_SLIGHT,		/* +1 because goodput did not rise */
-	ST_DELAY_DEC,		/* delay-based decrease */
-	ST_HOLD,		/* rounds skipped after a decrease */
-	ST_BDP_CAP,		/* cwnd clamped to 2 * BDP */
-	ST_UNDO,		/* spurious-loss undo */
-	ST_NR,
-};
-u64 dgcc_stats[ST_NR] = {};
-
-#define STAT(i) __sync_fetch_and_add(&dgcc_stats[i], 1)
 
 static __always_inline struct tcp_sock *tcp_sk(const struct sock *sk)
 {
@@ -139,7 +119,6 @@ void BPF_PROG(dgcc_init, struct sock *sk)
 	ca->prev_goodput_bps = 0;
 	ca->prior_cwnd = 0;
 	start_round(tp, ca);
-	STAT(ST_INIT);
 }
 
 /* Called on entry to recovery / RTO. cwnd is managed in cong_control, so leave ssthresh as
@@ -162,7 +141,6 @@ u32 BPF_PROG(dgcc_undo_cwnd, struct sock *sk)
 	if (ca->prior_cwnd > cwnd)
 		cwnd = ca->prior_cwnd;
 	ca->prior_cwnd = 0;
-	STAT(ST_UNDO);
 	return cwnd;
 }
 
@@ -182,18 +160,15 @@ void BPF_PROG(dgcc_set_state, struct sock *sk, u8 new_state)
 	/* the retransmissions that follow belong to this timeout, not to a new loss event */
 	ca->hold = 1;
 	start_round(tp, ca);
-	STAT(ST_TIMEOUT);
 }
 
 /* End-of-round decision (pseudocode steps 1 and 3-6). Returns the new cwnd. */
-static __always_inline u32 dgcc_round(struct sock *sk, struct tcp_sock *tp, struct dgcc *ca, u32 cwnd)
+static __always_inline u32 dgcc_round(struct tcp_sock *tp, struct dgcc *ca, u32 cwnd)
 {
 	u64 now = tp->tcp_mstamp;
 	u64 dur = now - ca->round_start_us;
 	u64 goodput = 0, cap;
 	u32 srtt = srtt_us(tp), extra, target, inc, dec_pct;
-
-	STAT(ST_ROUNDS);
 
 	/* 1. measure: base delay, current delay, extra delay, goodput */
 	if (ca->round_min_rtt_us != ~0U &&
@@ -220,17 +195,13 @@ static __always_inline u32 dgcc_round(struct sock *sk, struct tcp_sock *tp, stru
 		/* srtt is an EWMA and still reflects the queue before the last decrease */
 		ca->hold--;
 		ca->last_was_increase = 0;
-		STAT(ST_HOLD);
 	} else if (ca->round_losses) {
 		/* 3. loss: a real queue (large extra delay) or probably random loss */
 		ca->prior_cwnd = cwnd;
-		if (extra > target) {
+		if (extra > target)
 			cwnd = cwnd * LOSS_BIG_PCT / 100;
-			STAT(ST_LOSS_BIG);
-		} else {
+		else
 			cwnd = cwnd * LOSS_SMALL_PCT / 100;
-			STAT(ST_LOSS_SMALL);
-		}
 		ca->startup = 0;
 		ca->last_was_increase = 0;
 		ca->hold = 1;
@@ -240,17 +211,12 @@ static __always_inline u32 dgcc_round(struct sock *sk, struct tcp_sock *tp, stru
 		if (extra >= target / 2) {
 			ca->startup = 0;
 			tp->snd_ssthresh = cwnd;
-			STAT(ST_STARTUP_EXIT);
 		}
 	} else if (extra < target) {
 		/* 5a. below target: grow more when far below target, less when close */
 		inc = MIN_INC + (MAX_INC - MIN_INC) * (target - extra) / target;
-		if (ca->last_was_increase && goodput <= ca->prev_goodput_bps) {
+		if (ca->last_was_increase && goodput <= ca->prev_goodput_bps)
 			inc = SLIGHT_INC;
-			STAT(ST_INC_SLIGHT);
-		} else {
-			STAT(ST_INC);
-		}
 		cwnd += inc;
 		ca->last_was_increase = 1;
 	} else {
@@ -261,7 +227,6 @@ static __always_inline u32 dgcc_round(struct sock *sk, struct tcp_sock *tp, stru
 		cwnd -= cwnd * dec_pct / 100;
 		ca->last_was_increase = 0;
 		ca->hold = 1;
-		STAT(ST_DELAY_DEC);
 	}
 
 	/* 6. upper bound: about twice what the path can hold (not applied in start-up, where
@@ -270,10 +235,8 @@ static __always_inline u32 dgcc_round(struct sock *sk, struct tcp_sock *tp, stru
 		cap = BDP_CAP_MULT * ca->max_bw_bps * ca->base_rtt_us / (8 * USEC_PER_SEC) / tp->mss_cache;
 		if (cap < MIN_CWND)
 			cap = MIN_CWND;
-		if (cwnd > cap) {
+		if (cwnd > cap)
 			cwnd = cap;
-			STAT(ST_BDP_CAP);
-		}
 	}
 
 	ca->prev_goodput_bps = goodput;
@@ -281,8 +244,13 @@ static __always_inline u32 dgcc_round(struct sock *sk, struct tcp_sock *tp, stru
 	return cwnd;
 }
 
+/* Linux 6.10 added (ack, flag) before rs; bpf/Makefile defines CONG_CONTROL_ACK_FLAG for those kernels. */
 SEC("struct_ops/dgcc_cong_control")
+#ifdef CONG_CONTROL_ACK_FLAG
+void BPF_PROG(dgcc_cong_control, struct sock *sk, u32 ack, int flag, const struct rate_sample *rs)
+#else
 void BPF_PROG(dgcc_cong_control, struct sock *sk, const struct rate_sample *rs)
+#endif
 {
 	struct tcp_sock *tp = tcp_sk(sk);
 	struct dgcc *ca = ca_of(sk);
@@ -302,7 +270,7 @@ void BPF_PROG(dgcc_cong_control, struct sock *sk, const struct rate_sample *rs)
 	 * on valid rate samples only) */
 	if (rs->delivered >= 0 && rs->interval_us > 0 &&
 	    !before(rs->prior_delivered, ca->next_rtt_delivered))
-		cwnd = dgcc_round(sk, tp, ca, cwnd);
+		cwnd = dgcc_round(tp, ca, cwnd);
 
 	if (cwnd < MIN_CWND)
 		cwnd = MIN_CWND;

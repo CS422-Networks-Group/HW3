@@ -10,9 +10,9 @@ and compares it with the kernel's CUBIC, Reno, and BBR.
 | | version used |
 |---|---|
 | Kernel | `6.6.87.2-microsoft-standard-WSL2` (Ubuntu 24.04 on WSL2) |
-| Kernel features | `CONFIG_BPF_SYSCALL=y`, `CONFIG_BPF_JIT=y`, `CONFIG_DEBUG_INFO_BTF=y` (`/sys/kernel/btf/vmlinux`), `CONFIG_TCP_CONG_BBR=m` for the BBR baseline. BPF `tcp_congestion_ops` needs kernel >= 5.6; `dgcc` uses the 2-argument `cong_control(sk, rs)` hook, which is the signature up to 6.9 (6.10 added `ack, flag`). |
+| Kernel features | `CONFIG_BPF_SYSCALL=y`, `CONFIG_BPF_JIT=y`, `CONFIG_DEBUG_INFO_BTF=y` (`/sys/kernel/btf/vmlinux`), `CONFIG_TCP_CONG_BBR=m` for the BBR baseline. BPF `tcp_congestion_ops` needs kernel >= 5.6; the `cong_control` hook is `(sk, rs)` up to 6.9 and `(sk, ack, flag, rs)` from 6.10; `bpf/Makefile` picks the right one from `vmlinux.h`. |
 | Build | `clang`/`llvm` 18, `libbpf-dev` 1.3, `bpftool` from `linux-tools-generic` |
-| Python | 3.12, `pandas==3.0.6`, `matplotlib==3.11.2` |
+| Python | 3.12, `pandas==3.0.6`, `matplotlib==3.11.2` (`requirements.txt`) |
 
 ```
 sudo apt install -y clang llvm libbpf-dev linux-tools-common linux-tools-generic make python3-venv
@@ -25,8 +25,6 @@ python3 -m venv .venv && .venv/bin/pip install -r requirements.txt
 make -C bpf                 # bpftool btf dump -> bpf/vmlinux.h, clang -target bpf -> bpf/dgcc.bpf.o
 sudo make -C bpf load       # modprobe tcp_bbr; bpftool struct_ops register; allow "reno cubic bbr dgcc"
 cat /proc/sys/net/ipv4/tcp_available_congestion_control    # ... dgcc
-sudo bpftool struct_ops show                                # dgcc registered as tcp_congestion_ops
-sudo make -C bpf stats      # dgcc's global event counters (rounds, loss cuts, increases, ...)
 sudo make -C bpf unload     # bpftool struct_ops unregister name dgcc
 ```
 
@@ -53,7 +51,7 @@ scripts/run_all.sh --n 5 --reps 3       # any src/main.py option can be appended
 | `--retries` | extra tries for a failed test before the destination is dropped (default 1) |
 | `--max-attempts` | servers tried before reporting a shortfall (default 40) |
 | `--seed` | seed for the server shuffle (saved in `run_metadata.json`) |
-| `--representative` | destination for the time-series / scatter plots (default: median mean goodput) |
+| `--out` | output directory (default `results`) |
 | `--replot` | skip measurements and rebuild outputs from `<out>/tcp_stats.csv` |
 
 Test order: for each destination, repetition *r* runs the algorithm list rotated by *r − 1*
@@ -65,15 +63,12 @@ equally often. Every test's start time, position, and outcome is in `run_metadat
 | file | contents |
 |---|---|
 | `tcp_stats.csv` | one row per sample: run id, destination, rep, position, algorithm, goodput, decoded `TCP_INFO` |
-| `goodput.csv` | goodput-only view of the same samples |
 | `runs.csv` | one row per test: mean goodput, srtt, queueing delay, retransmissions, RTO flag, goodput / CUBIC |
-| `summary.csv` | goodput and srtt statistics per destination and algorithm |
+| `summary.csv` | HW2 Q1(c): goodput min / median / mean / p95 (and srtt) per destination and algorithm |
 | `aggregate.csv` | goodput, srtt, and queueing-delay statistics per algorithm over all destinations and reps |
 | `run_metadata.json` | session, kernel, seed, destinations, test order, and every test attempted |
-| `bpf_stats.txt` | how many times each dgcc branch ran in the kernel during the session |
-| `tcp_stats_timeseries.{pdf,png}` | HW2 Q2(b)(i) for all four algorithms at the representative destination |
+| `goodput_timeseries.{pdf,png}` | HW2 Q1(c): goodput over time for every destination, run, and algorithm |
+| `tcp_stats_timeseries.{pdf,png}` | HW2 Q2(b)(i) for all four algorithms at the representative destination (median mean goodput) |
 | `tcp_stats_scatter.{pdf,png}` | HW2 Q2(b)(ii) for all four algorithms at the representative destination |
-| `aggregate_by_destination.{pdf,png}` | mean goodput and srtt per destination and algorithm |
-| `aggregate_boxplot.{pdf,png}` | per-run goodput relative to CUBIC, and per-sample queueing delay |
 
 Percentiles use pandas' default linear interpolation between closest ranks (numpy `linear`, Hyndman–Fan type 7).

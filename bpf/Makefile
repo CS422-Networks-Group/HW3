@@ -2,7 +2,6 @@
 #   make            -> vmlinux.h + dgcc.bpf.o
 #   sudo make load  -> register "dgcc", load tcp_bbr, allow reno cubic bbr dgcc for unprivileged sockets
 #   sudo make unload
-#   sudo make stats -> dump the global event counters
 
 # Ubuntu's /usr/sbin/bpftool is a wrapper that only works when linux-tools matches the running
 # kernel (never true on WSL2), so use the versioned binary from linux-tools-generic directly.
@@ -11,7 +10,7 @@ CLANG ?= clang
 ARCH := $(shell uname -m | sed 's/x86_64/x86/; s/aarch64/arm64/')
 ALLOWED := reno cubic bbr dgcc
 
-.PHONY: all load unload stats clean check-bpftool
+.PHONY: all load unload clean check-bpftool
 
 all: dgcc.bpf.o
 
@@ -21,8 +20,11 @@ check-bpftool:
 vmlinux.h: | check-bpftool
 	$(BPFTOOL) btf dump file /sys/kernel/btf/vmlinux format c > $@
 
+# Linux 6.10+ calls cong_control(sk, ack, flag, rs) instead of cong_control(sk, rs)
 dgcc.bpf.o: dgcc.bpf.c vmlinux.h
-	$(CLANG) -O2 -g -Wall -target bpf -D__TARGET_ARCH_$(ARCH) -I. -c $< -o $@
+	$(CLANG) -O2 -g -Wall -target bpf -D__TARGET_ARCH_$(ARCH) -I. \
+		$$(grep -q 'cong_control)(struct sock \*, u32, int' vmlinux.h && echo -DCONG_CONTROL_ACK_FLAG) \
+		-c $< -o $@
 
 load: dgcc.bpf.o check-bpftool
 	modprobe tcp_bbr
@@ -32,9 +34,6 @@ load: dgcc.bpf.o check-bpftool
 
 unload: check-bpftool
 	$(BPFTOOL) struct_ops unregister name dgcc
-
-stats: check-bpftool
-	$(BPFTOOL) -j map dump name dgcc_bpf.bss
 
 clean:
 	rm -f dgcc.bpf.o vmlinux.h
