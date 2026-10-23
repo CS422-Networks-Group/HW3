@@ -1,0 +1,4 @@
+.venv/
+__pycache__/
+bpf/vmlinux.h
+bpf/*.o

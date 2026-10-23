@@ -1,0 +1,9 @@
+[project]
+name = "cs422-hw3"
+version = "0.1.0"
+description = "eBPF congestion control (dgcc) evaluated with an iperf3-compatible client"
+requires-python = ">=3.12,<3.13"
+dependencies = [
+    "pandas==3.0.6",
+    "matplotlib==3.11.2",
+]
