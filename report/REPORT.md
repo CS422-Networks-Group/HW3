@@ -1,6 +1,6 @@
 # CS 422 HW3 Report: eBPF Congestion Control (Option 1)
 
-Repository: [CS422-Networks-Group/HW3](https://github.com/CS422-Networks-Group/HW3/tree/hw3-cleanup) (branch `hw3-cleanup`; all code links point to it). Raw measurements are in [`results/`](https://github.com/CS422-Networks-Group/HW3/tree/hw3-cleanup/results); dependencies, configuration, and reproduction instructions are in the [README](https://github.com/CS422-Networks-Group/HW3/blob/hw3-cleanup/README.md).
+Repository: [CS422-Networks-Group/HW3](https://github.com/CS422-Networks-Group/HW3/tree/hw3-cleanup) (branch `hw3-cleanup`). Raw measurements: [`results/`](https://github.com/CS422-Networks-Group/HW3/tree/hw3-cleanup/results). Dependencies and reproduction: [README](https://github.com/CS422-Networks-Group/HW3/blob/hw3-cleanup/README.md).
 
 We implemented our HW2 Q3(b) algorithm, **dgcc**, as an eBPF `struct_ops` `tcp_congestion_ops` program ([`bpf/dgcc.bpf.c`](https://github.com/CS422-Networks-Group/HW3/blob/hw3-cleanup/bpf/dgcc.bpf.c)) and compared it with CUBIC, Reno, and BBR using our HW2 Python client ([`src/main.py`](https://github.com/CS422-Networks-Group/HW3/blob/hw3-cleanup/src/main.py)).
 
@@ -78,22 +78,11 @@ The kernel calls [`dgcc_cong_control`](https://github.com/CS422-Networks-Group/H
 
 Initial state ([`dgcc_init`](https://github.com/CS422-Networks-Group/HW3/blob/hw3-cleanup/bpf/dgcc.bpf.c#L104-L122)): cwnd = 4, start-up mode, base RTT and bandwidth unknown, ssthresh unset.
 
-| Parameter ([L23–L36](https://github.com/CS422-Networks-Group/HW3/blob/hw3-cleanup/bpf/dgcc.bpf.c#L23-L36)) | Value |
-| --- | --- |
-| Minimum window | 4 segments |
-| Delay target | base RTT / 8, clamped to [2, 20] ms |
-| Start-up exit | extra delay ≥ target / 2 |
-| Loss cut | × 0.6 if extra > target, × 0.9 otherwise |
-| Additive increase | 2–8 segments per round, 1 if the previous increase did not raise goodput |
-| Delay-based decrease | (extra − target) / (extra + target), at most 50% |
-| Base RTT window | 10 s |
-| Bandwidth window | max round goodput, kept for up to 10 rounds |
-| Upper bound | 2 × BDP |
-| Hold after a decrease | 1 round |
+Other parameters ([L23–L36](https://github.com/CS422-Networks-Group/HW3/blob/hw3-cleanup/bpf/dgcc.bpf.c#L23-L36)): minimum window 4 segments, base RTT window 10 s, bandwidth window 10 rounds, hold of 1 round after a decrease.
 
 ### 2.3 Changes from the pseudocode
 
-The pseudocode left "large", "noticeable", "a few", "a percentage", and the target unspecified; the parameters above fill them in. Other changes:
+The pseudocode left "large", "noticeable", "a few", "a percentage", and the target unspecified; 2.1 and 2.2 give the values we chose. Other changes:
 
 1. Start-up grows cwnd on every ACK instead of doubling it at the end of a round.
 2. After any decrease, the next round makes no decision, so one congestion event does not cause repeated cuts.
@@ -107,8 +96,8 @@ The pseudocode left "large", "noticeable", "a few", "a percentage", and the targ
 - **Algorithms:** dgcc, CUBIC, Reno, BBR.
 - **Destinations:** 5 public iperf3 servers drawn at random from [`data/listed_iperf3_servers.csv`](https://github.com/CS422-Networks-Group/HW3/blob/hw3-cleanup/data/listed_iperf3_servers.csv): 23.106.226.75:5201, 80.67.167.93:9200, 185.93.2.193:5201, 195.162.68.38:5201, 69.48.237.66:30001.
 - **Duration and sampling interval:** 10 s per test, sampled every 0.25 s, for all four algorithms.
-- **Repetitions:** 3 per algorithm per destination, i.e. **15 tests per algorithm, 60 tests total** (session `20261022T233436`).
-- **Logged per sample** ([`tcp_sample()`](https://github.com/CS422-Networks-Group/HW3/blob/hw3-cleanup/src/main.py#L44-L76), [`results/tcp_stats.csv`](https://github.com/CS422-Networks-Group/HW3/blob/hw3-cleanup/results/tcp_stats.csv)): `snd_cwnd`, throughput (Δ`bytes_acked` × 8 / Δt), `srtt` and `min_rtt`, and the loss signal: retransmitted segments per interval, plus `lost`, `ca_state`, and RTO back-offs.
+- **Repetitions:** 3 per algorithm per destination, i.e. **15 tests per algorithm, 60 tests total**.
+- **Logged per sample** ([`tcp_sample()`](https://github.com/CS422-Networks-Group/HW3/blob/hw3-cleanup/src/main.py#L44-L76), [`results/tcp_stats.csv`](https://github.com/CS422-Networks-Group/HW3/blob/hw3-cleanup/results/tcp_stats.csv)): `snd_cwnd`, throughput (Δ`bytes_acked` × 8 / Δt), `srtt` and `min_rtt`, and the loss signal (retransmitted segments per interval).
 
 **Test order.** [`run_destination()`](https://github.com/CS422-Networks-Group/HW3/blob/hw3-cleanup/src/main.py#L304-L332) runs all repetitions at one destination before moving to the next. Repetition *r* uses the algorithm list rotated by *r − 1* ([`rep_order()`](https://github.com/CS422-Networks-Group/HW3/blob/hw3-cleanup/src/main.py#L299-L301)):
 
@@ -117,12 +106,6 @@ The pseudocode left "large", "noticeable", "a few", "a percentage", and the targ
 | 1 | dgcc, cubic, reno, bbr |
 | 2 | cubic, reno, bbr, dgcc |
 | 3 | reno, bbr, dgcc, cubic |
-
-Command:
-
-```
-.venv/bin/python src/main.py --n 5 --reps 3 --out results   # --time 10 --interval 0.25
-```
 
 ## 4. Results
 
@@ -134,63 +117,50 @@ All plots use the same representative destination, **195.162.68.38:5201**, chose
 
 ![timeseries, dgcc](figures/tcp_stats_timeseries_dgcc.png)
 
-*Figure 1a: dgcc. Source: [`results/tcp_stats_timeseries_dgcc.pdf`](https://github.com/CS422-Networks-Group/HW3/blob/hw3-cleanup/results/tcp_stats_timeseries_dgcc.pdf), generated by [`plot_tcp_stats()`](https://github.com/CS422-Networks-Group/HW3/blob/hw3-cleanup/src/main.py#L406-L445).*
+*Figure 1a: dgcc. Generated by [`plot_tcp_stats()`](https://github.com/CS422-Networks-Group/HW3/blob/hw3-cleanup/src/main.py#L406-L445).*
 
 ![timeseries, CUBIC](figures/tcp_stats_timeseries_cubic.png)
 
-*Figure 1b: CUBIC. Source: [`results/tcp_stats_timeseries_cubic.pdf`](https://github.com/CS422-Networks-Group/HW3/blob/hw3-cleanup/results/tcp_stats_timeseries_cubic.pdf), generated by [`plot_tcp_stats()`](https://github.com/CS422-Networks-Group/HW3/blob/hw3-cleanup/src/main.py#L406-L445).*
+*Figure 1b: CUBIC. Generated by [`plot_tcp_stats()`](https://github.com/CS422-Networks-Group/HW3/blob/hw3-cleanup/src/main.py#L406-L445).*
 
 ![timeseries, Reno](figures/tcp_stats_timeseries_reno.png)
 
-*Figure 1c: Reno. Source: [`results/tcp_stats_timeseries_reno.pdf`](https://github.com/CS422-Networks-Group/HW3/blob/hw3-cleanup/results/tcp_stats_timeseries_reno.pdf), generated by [`plot_tcp_stats()`](https://github.com/CS422-Networks-Group/HW3/blob/hw3-cleanup/src/main.py#L406-L445).*
+*Figure 1c: Reno. Generated by [`plot_tcp_stats()`](https://github.com/CS422-Networks-Group/HW3/blob/hw3-cleanup/src/main.py#L406-L445).*
 
 ![timeseries, BBR](figures/tcp_stats_timeseries_bbr.png)
 
-*Figure 1d: BBR. Source: [`results/tcp_stats_timeseries_bbr.pdf`](https://github.com/CS422-Networks-Group/HW3/blob/hw3-cleanup/results/tcp_stats_timeseries_bbr.pdf), generated by [`plot_tcp_stats()`](https://github.com/CS422-Networks-Group/HW3/blob/hw3-cleanup/src/main.py#L406-L445).*
+*Figure 1d: BBR. Generated by [`plot_tcp_stats()`](https://github.com/CS422-Networks-Group/HW3/blob/hw3-cleanup/src/main.py#L406-L445).*
 
 #### TCP stats vs goodput (195.162.68.38:5201)
 
 ![scatter, dgcc](figures/tcp_stats_scatter_dgcc.png)
 
-*Figure 2a: dgcc. Source: [`results/tcp_stats_scatter_dgcc.pdf`](https://github.com/CS422-Networks-Group/HW3/blob/hw3-cleanup/results/tcp_stats_scatter_dgcc.pdf), generated by [`plot_tcp_stats()`](https://github.com/CS422-Networks-Group/HW3/blob/hw3-cleanup/src/main.py#L406-L445).*
+*Figure 2a: dgcc. Generated by [`plot_tcp_stats()`](https://github.com/CS422-Networks-Group/HW3/blob/hw3-cleanup/src/main.py#L406-L445).*
 
 ![scatter, CUBIC](figures/tcp_stats_scatter_cubic.png)
 
-*Figure 2b: CUBIC. Source: [`results/tcp_stats_scatter_cubic.pdf`](https://github.com/CS422-Networks-Group/HW3/blob/hw3-cleanup/results/tcp_stats_scatter_cubic.pdf), generated by [`plot_tcp_stats()`](https://github.com/CS422-Networks-Group/HW3/blob/hw3-cleanup/src/main.py#L406-L445).*
+*Figure 2b: CUBIC. Generated by [`plot_tcp_stats()`](https://github.com/CS422-Networks-Group/HW3/blob/hw3-cleanup/src/main.py#L406-L445).*
 
 ![scatter, Reno](figures/tcp_stats_scatter_reno.png)
 
-*Figure 2c: Reno. Source: [`results/tcp_stats_scatter_reno.pdf`](https://github.com/CS422-Networks-Group/HW3/blob/hw3-cleanup/results/tcp_stats_scatter_reno.pdf), generated by [`plot_tcp_stats()`](https://github.com/CS422-Networks-Group/HW3/blob/hw3-cleanup/src/main.py#L406-L445).*
+*Figure 2c: Reno. Generated by [`plot_tcp_stats()`](https://github.com/CS422-Networks-Group/HW3/blob/hw3-cleanup/src/main.py#L406-L445).*
 
 ![scatter, BBR](figures/tcp_stats_scatter_bbr.png)
 
-*Figure 2d: BBR. Source: [`results/tcp_stats_scatter_bbr.pdf`](https://github.com/CS422-Networks-Group/HW3/blob/hw3-cleanup/results/tcp_stats_scatter_bbr.pdf), generated by [`plot_tcp_stats()`](https://github.com/CS422-Networks-Group/HW3/blob/hw3-cleanup/src/main.py#L406-L445).*
+*Figure 2d: BBR. Generated by [`plot_tcp_stats()`](https://github.com/CS422-Networks-Group/HW3/blob/hw3-cleanup/src/main.py#L406-L445).*
 
 ### 4.2 Aggregate statistics
 
-Over all 5 destinations × 3 repetitions ([`results/aggregate.csv`](https://github.com/CS422-Networks-Group/HW3/blob/hw3-cleanup/results/aggregate.csv), computed by [`summarize()`](https://github.com/CS422-Networks-Group/HW3/blob/hw3-cleanup/src/main.py#L347-L393)). Queueing delay is srtt − min_rtt per sample. "Run mean ± std" is over the 15 per-test means. "vs CUBIC" is each test's mean goodput divided by the CUBIC mean at the same destination, averaged over the 15 tests.
-
-**Throughput (Mbit/s).** Percentiles are over samples.
+Over all samples from 5 destinations × 3 repetitions ([`results/aggregate.csv`](https://github.com/CS422-Networks-Group/HW3/blob/hw3-cleanup/results/aggregate.csv), computed by [`summarize()`](https://github.com/CS422-Networks-Group/HW3/blob/hw3-cleanup/src/main.py#L347-L393)).
 
 | | dgcc | CUBIC | Reno | BBR |
 | --- | --- | --- | --- | --- |
-| mean | 129.4 | 141.0 | 117.1 | **151.4** |
-| p5 | 3.4 | 7.6 | 3.9 | 3.9 |
-| median | 153.2 | 155.8 | 119.8 | **158.9** |
-| p95 | **237.5** | 228.4 | 225.8 | 237.0 |
-| run mean ± std | 129.1 ± **67.1** | 141.7 ± 41.7 | 117.3 ± 35.3 | 149.6 ± 47.1 |
-| vs CUBIC (mean) | 0.91 | 1.00 | 0.86 | **1.05** |
-
-**RTT (ms).**
-
-| | dgcc | CUBIC | Reno | BBR |
-| --- | --- | --- | --- | --- |
-| srtt mean | 119.2 | 120.3 | **118.9** | 124.1 |
-| srtt median | 113.9 | 118.7 | 114.2 | **113.3** |
-| srtt p95 | 144.9 | **143.3** | 144.2 | 149.6 |
-| queueing delay, mean | 3.0 | 4.0 | **2.7** | 7.2 |
-| queueing delay, median | 1.7 | 1.6 | 1.5 | **1.0** |
-| queueing delay, p95 | 10.1 | 10.5 | **4.9** | 8.0 |
+| goodput mean (Mbit/s) | 129.4 | 141.0 | 117.1 | 151.4 |
+| goodput median (Mbit/s) | 153.2 | 155.8 | 119.8 | 158.9 |
+| goodput p95 (Mbit/s) | 237.5 | 228.4 | 225.8 | 237.0 |
+| srtt mean (ms) | 119.2 | 120.3 | 118.9 | 124.1 |
+| srtt median (ms) | 113.9 | 118.7 | 114.2 | 113.3 |
+| srtt p95 (ms) | 144.9 | 143.3 | 144.2 | 149.6 |
 
 ### 4.3 Discussion
 
