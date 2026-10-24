@@ -82,7 +82,7 @@ dgcc changes cwnd (measured in segments) once per round trip, called a *round*. 
 
 After any decrease, the next round makes no change (see 2.3).
 
-**Limits** ([L232–L240](https://github.com/CS422-Networks-Group/HW3/blob/hw3-cleanup/bpf/dgcc.bpf.c#L232-L240), [L275–L279](https://github.com/CS422-Networks-Group/HW3/blob/hw3-cleanup/bpf/dgcc.bpf.c#L275-L279)): cwnd always stays at or above 4 segments. Outside start-up, it also stays at or below twice the path's bandwidth-delay product, i.e. 2 × the highest recent round goodput × the base delay. The highest goodput is kept for up to 10 rounds.
+**Limits** (pseudocode step 6; [L232–L240](https://github.com/CS422-Networks-Group/HW3/blob/hw3-cleanup/bpf/dgcc.bpf.c#L232-L240), [L275–L279](https://github.com/CS422-Networks-Group/HW3/blob/hw3-cleanup/bpf/dgcc.bpf.c#L275-L279)): cwnd never drops below 4 segments. After start-up, it also never goes above about twice what the path can hold, which dgcc estimates as the highest recent goodput × the base delay.
 
 ### 2.2 Initial state and parameters
 
