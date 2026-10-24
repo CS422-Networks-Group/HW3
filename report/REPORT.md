@@ -103,7 +103,7 @@ Initial state ([`dgcc_init`](https://github.com/CS422-Networks-Group/HW3/blob/hw
 
 ### 2.3 Changes from the pseudocode
 
-The pseudocode left "large", "noticeable", "a few", "a percentage", and the target unspecified; the parameters above fill them in. Other changes:
+The pseudocode left "large", "noticeable", "a few", "a percentage", and the target unspecified; the parameters above specify what they are. Other changes:
 
 1. Start-up adds to cwnd on every ACK instead of doubling it all at once at the end of a round. It still doubles each round, but avoids sending a big burst.
 2. After cwnd is cut, the next round makes no change. The smoothed RTT takes a while to drop after a cut, so without this one congestion event could cause several cuts.
