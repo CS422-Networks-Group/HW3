@@ -1,0 +1,1161 @@
+{
+  "session": "20261022T233436",
+  "kernel": "6.6.87.2-microsoft-standard-WSL2",
+  "seed": 3624686937,
+  "requested": 5,
+  "succeeded": 5,
+  "destinations": [
+    "23.106.226.75:5201",
+    "80.67.167.93:9200",
+    "185.93.2.193:5201",
+    "195.162.68.38:5201",
+    "69.48.237.66:30001"
+  ],
+  "algorithms": [
+    "dgcc",
+    "cubic",
+    "reno",
+    "bbr"
+  ],
+  "reps": 3,
+  "test_order": {
+    "1": [
+      "dgcc",
+      "cubic",
+      "reno",
+      "bbr"
+    ],
+    "2": [
+      "cubic",
+      "reno",
+      "bbr",
+      "dgcc"
+    ],
+    "3": [
+      "reno",
+      "bbr",
+      "dgcc",
+      "cubic"
+    ]
+  },
+  "time_s": 10,
+  "interval_s": 0.25,
+  "retries": 1,
+  "attempts": [
+    {
+      "run_id": "20261022T233436-01-r1-dgcc",
+      "destination": "23.106.226.75:5201",
+      "rep": 1,
+      "position": 1,
+      "algorithm": "dgcc",
+      "start_unix_s": 1792737276.8228898,
+      "status": "ok"
+    },
+    {
+      "run_id": "20261022T233436-01-r1-cubic",
+      "destination": "23.106.226.75:5201",
+      "rep": 1,
+      "position": 2,
+      "algorithm": "cubic",
+      "start_unix_s": 1792737288.182843,
+      "status": "failed",
+      "error": "[Errno 104] Connection reset by peer"
+    },
+    {
+      "run_id": "20261022T233436-01-r1-cubic",
+      "destination": "23.106.226.75:5201",
+      "rep": 1,
+      "position": 2,
+      "algorithm": "cubic",
+      "start_unix_s": 1792737290.4590383,
+      "status": "ok"
+    },
+    {
+      "run_id": "20261022T233436-01-r1-reno",
+      "destination": "23.106.226.75:5201",
+      "rep": 1,
+      "position": 3,
+      "algorithm": "reno",
+      "start_unix_s": 1792737301.8049796,
+      "status": "ok"
+    },
+    {
+      "run_id": "20261022T233436-01-r1-bbr",
+      "destination": "23.106.226.75:5201",
+      "rep": 1,
+      "position": 4,
+      "algorithm": "bbr",
+      "start_unix_s": 1792737313.181142,
+      "status": "ok"
+    },
+    {
+      "run_id": "20261022T233436-01-r2-cubic",
+      "destination": "23.106.226.75:5201",
+      "rep": 2,
+      "position": 1,
+      "algorithm": "cubic",
+      "start_unix_s": 1792737325.3463,
+      "status": "ok"
+    },
+    {
+      "run_id": "20261022T233436-01-r2-reno",
+      "destination": "23.106.226.75:5201",
+      "rep": 2,
+      "position": 2,
+      "algorithm": "reno",
+      "start_unix_s": 1792737336.793888,
+      "status": "failed",
+      "error": "[Errno 104] Connection reset by peer"
+    },
+    {
+      "run_id": "20261022T233436-01-r2-reno",
+      "destination": "23.106.226.75:5201",
+      "rep": 2,
+      "position": 2,
+      "algorithm": "reno",
+      "start_unix_s": 1792737339.0644946,
+      "status": "ok"
+    },
+    {
+      "run_id": "20261022T233436-01-r2-bbr",
+      "destination": "23.106.226.75:5201",
+      "rep": 2,
+      "position": 3,
+      "algorithm": "bbr",
+      "start_unix_s": 1792737350.5067472,
+      "status": "failed",
+      "error": "[Errno 104] Connection reset by peer"
+    },
+    {
+      "run_id": "20261022T233436-01-r2-bbr",
+      "destination": "23.106.226.75:5201",
+      "rep": 2,
+      "position": 3,
+      "algorithm": "bbr",
+      "start_unix_s": 1792737352.7866244,
+      "status": "ok"
+    },
+    {
+      "run_id": "20261022T233436-01-r2-dgcc",
+      "destination": "23.106.226.75:5201",
+      "rep": 2,
+      "position": 4,
+      "algorithm": "dgcc",
+      "start_unix_s": 1792737364.5641682,
+      "status": "failed",
+      "error": "[Errno 111] Connection refused"
+    },
+    {
+      "run_id": "20261022T233436-01-r2-dgcc",
+      "destination": "23.106.226.75:5201",
+      "rep": 2,
+      "position": 4,
+      "algorithm": "dgcc",
+      "start_unix_s": 1792737366.7117298,
+      "status": "ok"
+    },
+    {
+      "run_id": "20261022T233436-01-r3-reno",
+      "destination": "23.106.226.75:5201",
+      "rep": 3,
+      "position": 1,
+      "algorithm": "reno",
+      "start_unix_s": 1792737378.124237,
+      "status": "failed",
+      "error": "[Errno 104] Connection reset by peer"
+    },
+    {
+      "run_id": "20261022T233436-01-r3-reno",
+      "destination": "23.106.226.75:5201",
+      "rep": 3,
+      "position": 1,
+      "algorithm": "reno",
+      "start_unix_s": 1792737380.4365888,
+      "status": "ok"
+    },
+    {
+      "run_id": "20261022T233436-01-r3-bbr",
+      "destination": "23.106.226.75:5201",
+      "rep": 3,
+      "position": 2,
+      "algorithm": "bbr",
+      "start_unix_s": 1792737392.4616368,
+      "status": "ok"
+    },
+    {
+      "run_id": "20261022T233436-01-r3-dgcc",
+      "destination": "23.106.226.75:5201",
+      "rep": 3,
+      "position": 3,
+      "algorithm": "dgcc",
+      "start_unix_s": 1792737403.8384135,
+      "status": "ok"
+    },
+    {
+      "run_id": "20261022T233436-01-r3-cubic",
+      "destination": "23.106.226.75:5201",
+      "rep": 3,
+      "position": 4,
+      "algorithm": "cubic",
+      "start_unix_s": 1792737415.2266207,
+      "status": "failed",
+      "error": "[Errno 104] Connection reset by peer"
+    },
+    {
+      "run_id": "20261022T233436-01-r3-cubic",
+      "destination": "23.106.226.75:5201",
+      "rep": 3,
+      "position": 4,
+      "algorithm": "cubic",
+      "start_unix_s": 1792737417.50857,
+      "status": "ok"
+    },
+    {
+      "run_id": "20261022T233436-02-r1-dgcc",
+      "destination": "51.158.1.21:5200",
+      "rep": 1,
+      "position": 1,
+      "algorithm": "dgcc",
+      "start_unix_s": 1792737429.6244104,
+      "status": "failed",
+      "error": "server busy or closed connection"
+    },
+    {
+      "run_id": "20261022T233436-02-r1-dgcc",
+      "destination": "51.158.1.21:5200",
+      "rep": 1,
+      "position": 1,
+      "algorithm": "dgcc",
+      "start_unix_s": 1792737431.8174226,
+      "status": "failed",
+      "error": "server busy or closed connection"
+    },
+    {
+      "run_id": "20261022T233436-03-r1-dgcc",
+      "destination": "185.76.9.135:5201",
+      "rep": 1,
+      "position": 1,
+      "algorithm": "dgcc",
+      "start_unix_s": 1792737434.0004153,
+      "status": "failed",
+      "error": "[Errno 111] Connection refused"
+    },
+    {
+      "run_id": "20261022T233436-03-r1-dgcc",
+      "destination": "185.76.9.135:5201",
+      "rep": 1,
+      "position": 1,
+      "algorithm": "dgcc",
+      "start_unix_s": 1792737436.113473,
+      "status": "failed",
+      "error": "[Errno 111] Connection refused"
+    },
+    {
+      "run_id": "20261022T233436-04-r1-dgcc",
+      "destination": "173.243.131.29:30001",
+      "rep": 1,
+      "position": 1,
+      "algorithm": "dgcc",
+      "start_unix_s": 1792737438.2301927,
+      "status": "failed",
+      "error": "server busy or closed connection"
+    },
+    {
+      "run_id": "20261022T233436-04-r1-dgcc",
+      "destination": "173.243.131.29:30001",
+      "rep": 1,
+      "position": 1,
+      "algorithm": "dgcc",
+      "start_unix_s": 1792737440.2817008,
+      "status": "failed",
+      "error": "server busy or closed connection"
+    },
+    {
+      "run_id": "20261022T233436-05-r1-dgcc",
+      "destination": "217.18.95.142:5201",
+      "rep": 1,
+      "position": 1,
+      "algorithm": "dgcc",
+      "start_unix_s": 1792737442.3337755,
+      "status": "failed",
+      "error": "[Errno 104] Connection reset by peer"
+    },
+    {
+      "run_id": "20261022T233436-05-r1-dgcc",
+      "destination": "217.18.95.142:5201",
+      "rep": 1,
+      "position": 1,
+      "algorithm": "dgcc",
+      "start_unix_s": 1792737451.4484944,
+      "status": "ok"
+    },
+    {
+      "run_id": "20261022T233436-05-r1-cubic",
+      "destination": "217.18.95.142:5201",
+      "rep": 1,
+      "position": 2,
+      "algorithm": "cubic",
+      "start_unix_s": 1792737462.9109597,
+      "status": "ok"
+    },
+    {
+      "run_id": "20261022T233436-05-r1-reno",
+      "destination": "217.18.95.142:5201",
+      "rep": 1,
+      "position": 3,
+      "algorithm": "reno",
+      "start_unix_s": 1792737473.8145537,
+      "status": "ok"
+    },
+    {
+      "run_id": "20261022T233436-05-r1-bbr",
+      "destination": "217.18.95.142:5201",
+      "rep": 1,
+      "position": 4,
+      "algorithm": "bbr",
+      "start_unix_s": 1792737484.7888517,
+      "status": "ok"
+    },
+    {
+      "run_id": "20261022T233436-05-r2-cubic",
+      "destination": "217.18.95.142:5201",
+      "rep": 2,
+      "position": 1,
+      "algorithm": "cubic",
+      "start_unix_s": 1792737496.2194562,
+      "status": "ok"
+    },
+    {
+      "run_id": "20261022T233436-05-r2-reno",
+      "destination": "217.18.95.142:5201",
+      "rep": 2,
+      "position": 2,
+      "algorithm": "reno",
+      "start_unix_s": 1792737507.2747333,
+      "status": "failed",
+      "error": "[Errno 104] Connection reset by peer"
+    },
+    {
+      "run_id": "20261022T233436-05-r2-reno",
+      "destination": "217.18.95.142:5201",
+      "rep": 2,
+      "position": 2,
+      "algorithm": "reno",
+      "start_unix_s": 1792737509.4988918,
+      "status": "failed",
+      "error": "[Errno 104] Connection reset by peer"
+    },
+    {
+      "run_id": "20261022T233436-06-r1-dgcc",
+      "destination": "80.67.167.93:9200",
+      "rep": 1,
+      "position": 1,
+      "algorithm": "dgcc",
+      "start_unix_s": 1792737511.6938016,
+      "status": "ok"
+    },
+    {
+      "run_id": "20261022T233436-06-r1-cubic",
+      "destination": "80.67.167.93:9200",
+      "rep": 1,
+      "position": 2,
+      "algorithm": "cubic",
+      "start_unix_s": 1792737523.4390018,
+      "status": "failed",
+      "error": "[Errno 111] Connection refused"
+    },
+    {
+      "run_id": "20261022T233436-06-r1-cubic",
+      "destination": "80.67.167.93:9200",
+      "rep": 1,
+      "position": 2,
+      "algorithm": "cubic",
+      "start_unix_s": 1792737525.5355613,
+      "status": "ok"
+    },
+    {
+      "run_id": "20261022T233436-06-r1-reno",
+      "destination": "80.67.167.93:9200",
+      "rep": 1,
+      "position": 3,
+      "algorithm": "reno",
+      "start_unix_s": 1792737536.5206642,
+      "status": "failed",
+      "error": "[Errno 111] Connection refused"
+    },
+    {
+      "run_id": "20261022T233436-06-r1-reno",
+      "destination": "80.67.167.93:9200",
+      "rep": 1,
+      "position": 3,
+      "algorithm": "reno",
+      "start_unix_s": 1792737538.6150043,
+      "status": "ok"
+    },
+    {
+      "run_id": "20261022T233436-06-r1-bbr",
+      "destination": "80.67.167.93:9200",
+      "rep": 1,
+      "position": 4,
+      "algorithm": "bbr",
+      "start_unix_s": 1792737549.6138096,
+      "status": "failed",
+      "error": "[Errno 111] Connection refused"
+    },
+    {
+      "run_id": "20261022T233436-06-r1-bbr",
+      "destination": "80.67.167.93:9200",
+      "rep": 1,
+      "position": 4,
+      "algorithm": "bbr",
+      "start_unix_s": 1792737551.7166772,
+      "status": "ok"
+    },
+    {
+      "run_id": "20261022T233436-06-r2-cubic",
+      "destination": "80.67.167.93:9200",
+      "rep": 2,
+      "position": 1,
+      "algorithm": "cubic",
+      "start_unix_s": 1792737563.143963,
+      "status": "failed",
+      "error": "[Errno 111] Connection refused"
+    },
+    {
+      "run_id": "20261022T233436-06-r2-cubic",
+      "destination": "80.67.167.93:9200",
+      "rep": 2,
+      "position": 1,
+      "algorithm": "cubic",
+      "start_unix_s": 1792737565.2389007,
+      "status": "ok"
+    },
+    {
+      "run_id": "20261022T233436-06-r2-reno",
+      "destination": "80.67.167.93:9200",
+      "rep": 2,
+      "position": 2,
+      "algorithm": "reno",
+      "start_unix_s": 1792737576.2937403,
+      "status": "failed",
+      "error": "[Errno 104] Connection reset by peer"
+    },
+    {
+      "run_id": "20261022T233436-06-r2-reno",
+      "destination": "80.67.167.93:9200",
+      "rep": 2,
+      "position": 2,
+      "algorithm": "reno",
+      "start_unix_s": 1792737578.4998438,
+      "status": "ok"
+    },
+    {
+      "run_id": "20261022T233436-06-r2-bbr",
+      "destination": "80.67.167.93:9200",
+      "rep": 2,
+      "position": 3,
+      "algorithm": "bbr",
+      "start_unix_s": 1792737589.9015605,
+      "status": "failed",
+      "error": "[Errno 104] Connection reset by peer"
+    },
+    {
+      "run_id": "20261022T233436-06-r2-bbr",
+      "destination": "80.67.167.93:9200",
+      "rep": 2,
+      "position": 3,
+      "algorithm": "bbr",
+      "start_unix_s": 1792737592.095323,
+      "status": "ok"
+    },
+    {
+      "run_id": "20261022T233436-06-r2-dgcc",
+      "destination": "80.67.167.93:9200",
+      "rep": 2,
+      "position": 4,
+      "algorithm": "dgcc",
+      "start_unix_s": 1792737603.0628579,
+      "status": "failed",
+      "error": "[Errno 111] Connection refused"
+    },
+    {
+      "run_id": "20261022T233436-06-r2-dgcc",
+      "destination": "80.67.167.93:9200",
+      "rep": 2,
+      "position": 4,
+      "algorithm": "dgcc",
+      "start_unix_s": 1792737605.1657493,
+      "status": "ok"
+    },
+    {
+      "run_id": "20261022T233436-06-r3-reno",
+      "destination": "80.67.167.93:9200",
+      "rep": 3,
+      "position": 1,
+      "algorithm": "reno",
+      "start_unix_s": 1792737616.1378152,
+      "status": "failed",
+      "error": "[Errno 111] Connection refused"
+    },
+    {
+      "run_id": "20261022T233436-06-r3-reno",
+      "destination": "80.67.167.93:9200",
+      "rep": 3,
+      "position": 1,
+      "algorithm": "reno",
+      "start_unix_s": 1792737618.2407575,
+      "status": "ok"
+    },
+    {
+      "run_id": "20261022T233436-06-r3-bbr",
+      "destination": "80.67.167.93:9200",
+      "rep": 3,
+      "position": 2,
+      "algorithm": "bbr",
+      "start_unix_s": 1792737629.2646203,
+      "status": "failed",
+      "error": "[Errno 104] Connection reset by peer"
+    },
+    {
+      "run_id": "20261022T233436-06-r3-bbr",
+      "destination": "80.67.167.93:9200",
+      "rep": 3,
+      "position": 2,
+      "algorithm": "bbr",
+      "start_unix_s": 1792737631.4528565,
+      "status": "ok"
+    },
+    {
+      "run_id": "20261022T233436-06-r3-dgcc",
+      "destination": "80.67.167.93:9200",
+      "rep": 3,
+      "position": 3,
+      "algorithm": "dgcc",
+      "start_unix_s": 1792737642.5704181,
+      "status": "failed",
+      "error": "[Errno 104] Connection reset by peer"
+    },
+    {
+      "run_id": "20261022T233436-06-r3-dgcc",
+      "destination": "80.67.167.93:9200",
+      "rep": 3,
+      "position": 3,
+      "algorithm": "dgcc",
+      "start_unix_s": 1792737644.79235,
+      "status": "ok"
+    },
+    {
+      "run_id": "20261022T233436-06-r3-cubic",
+      "destination": "80.67.167.93:9200",
+      "rep": 3,
+      "position": 4,
+      "algorithm": "cubic",
+      "start_unix_s": 1792737655.8518116,
+      "status": "failed",
+      "error": "[Errno 104] Connection reset by peer"
+    },
+    {
+      "run_id": "20261022T233436-06-r3-cubic",
+      "destination": "80.67.167.93:9200",
+      "rep": 3,
+      "position": 4,
+      "algorithm": "cubic",
+      "start_unix_s": 1792737658.069699,
+      "status": "ok"
+    },
+    {
+      "run_id": "20261022T233436-07-r1-dgcc",
+      "destination": "185.93.2.193:5201",
+      "rep": 1,
+      "position": 1,
+      "algorithm": "dgcc",
+      "start_unix_s": 1792737669.0956125,
+      "status": "ok"
+    },
+    {
+      "run_id": "20261022T233436-07-r1-cubic",
+      "destination": "185.93.2.193:5201",
+      "rep": 1,
+      "position": 2,
+      "algorithm": "cubic",
+      "start_unix_s": 1792737680.1089194,
+      "status": "failed",
+      "error": "[Errno 104] Connection reset by peer"
+    },
+    {
+      "run_id": "20261022T233436-07-r1-cubic",
+      "destination": "185.93.2.193:5201",
+      "rep": 1,
+      "position": 2,
+      "algorithm": "cubic",
+      "start_unix_s": 1792737682.302369,
+      "status": "ok"
+    },
+    {
+      "run_id": "20261022T233436-07-r1-reno",
+      "destination": "185.93.2.193:5201",
+      "rep": 1,
+      "position": 3,
+      "algorithm": "reno",
+      "start_unix_s": 1792737693.2766464,
+      "status": "failed",
+      "error": "[Errno 111] Connection refused"
+    },
+    {
+      "run_id": "20261022T233436-07-r1-reno",
+      "destination": "185.93.2.193:5201",
+      "rep": 1,
+      "position": 3,
+      "algorithm": "reno",
+      "start_unix_s": 1792737695.3868616,
+      "status": "ok"
+    },
+    {
+      "run_id": "20261022T233436-07-r1-bbr",
+      "destination": "185.93.2.193:5201",
+      "rep": 1,
+      "position": 4,
+      "algorithm": "bbr",
+      "start_unix_s": 1792737706.3742115,
+      "status": "failed",
+      "error": "[Errno 111] Connection refused"
+    },
+    {
+      "run_id": "20261022T233436-07-r1-bbr",
+      "destination": "185.93.2.193:5201",
+      "rep": 1,
+      "position": 4,
+      "algorithm": "bbr",
+      "start_unix_s": 1792737708.4715,
+      "status": "ok"
+    },
+    {
+      "run_id": "20261022T233436-07-r2-cubic",
+      "destination": "185.93.2.193:5201",
+      "rep": 2,
+      "position": 1,
+      "algorithm": "cubic",
+      "start_unix_s": 1792737719.484483,
+      "status": "failed",
+      "error": "[Errno 104] Connection reset by peer"
+    },
+    {
+      "run_id": "20261022T233436-07-r2-cubic",
+      "destination": "185.93.2.193:5201",
+      "rep": 2,
+      "position": 1,
+      "algorithm": "cubic",
+      "start_unix_s": 1792737721.6856446,
+      "status": "ok"
+    },
+    {
+      "run_id": "20261022T233436-07-r2-reno",
+      "destination": "185.93.2.193:5201",
+      "rep": 2,
+      "position": 2,
+      "algorithm": "reno",
+      "start_unix_s": 1792737732.6565988,
+      "status": "failed",
+      "error": "[Errno 111] Connection refused"
+    },
+    {
+      "run_id": "20261022T233436-07-r2-reno",
+      "destination": "185.93.2.193:5201",
+      "rep": 2,
+      "position": 2,
+      "algorithm": "reno",
+      "start_unix_s": 1792737734.7564657,
+      "status": "ok"
+    },
+    {
+      "run_id": "20261022T233436-07-r2-bbr",
+      "destination": "185.93.2.193:5201",
+      "rep": 2,
+      "position": 3,
+      "algorithm": "bbr",
+      "start_unix_s": 1792737745.8355665,
+      "status": "failed",
+      "error": "[Errno 111] Connection refused"
+    },
+    {
+      "run_id": "20261022T233436-07-r2-bbr",
+      "destination": "185.93.2.193:5201",
+      "rep": 2,
+      "position": 3,
+      "algorithm": "bbr",
+      "start_unix_s": 1792737748.3389819,
+      "status": "ok"
+    },
+    {
+      "run_id": "20261022T233436-07-r2-dgcc",
+      "destination": "185.93.2.193:5201",
+      "rep": 2,
+      "position": 4,
+      "algorithm": "dgcc",
+      "start_unix_s": 1792737759.2827787,
+      "status": "failed",
+      "error": "[Errno 111] Connection refused"
+    },
+    {
+      "run_id": "20261022T233436-07-r2-dgcc",
+      "destination": "185.93.2.193:5201",
+      "rep": 2,
+      "position": 4,
+      "algorithm": "dgcc",
+      "start_unix_s": 1792737761.37879,
+      "status": "ok"
+    },
+    {
+      "run_id": "20261022T233436-07-r3-reno",
+      "destination": "185.93.2.193:5201",
+      "rep": 3,
+      "position": 1,
+      "algorithm": "reno",
+      "start_unix_s": 1792737772.333998,
+      "status": "failed",
+      "error": "[Errno 104] Connection reset by peer"
+    },
+    {
+      "run_id": "20261022T233436-07-r3-reno",
+      "destination": "185.93.2.193:5201",
+      "rep": 3,
+      "position": 1,
+      "algorithm": "reno",
+      "start_unix_s": 1792737774.5240607,
+      "status": "ok"
+    },
+    {
+      "run_id": "20261022T233436-07-r3-bbr",
+      "destination": "185.93.2.193:5201",
+      "rep": 3,
+      "position": 2,
+      "algorithm": "bbr",
+      "start_unix_s": 1792737785.9076564,
+      "status": "failed",
+      "error": "[Errno 111] Connection refused"
+    },
+    {
+      "run_id": "20261022T233436-07-r3-bbr",
+      "destination": "185.93.2.193:5201",
+      "rep": 3,
+      "position": 2,
+      "algorithm": "bbr",
+      "start_unix_s": 1792737788.0043907,
+      "status": "ok"
+    },
+    {
+      "run_id": "20261022T233436-07-r3-dgcc",
+      "destination": "185.93.2.193:5201",
+      "rep": 3,
+      "position": 3,
+      "algorithm": "dgcc",
+      "start_unix_s": 1792737798.9833233,
+      "status": "failed",
+      "error": "[Errno 104] Connection reset by peer"
+    },
+    {
+      "run_id": "20261022T233436-07-r3-dgcc",
+      "destination": "185.93.2.193:5201",
+      "rep": 3,
+      "position": 3,
+      "algorithm": "dgcc",
+      "start_unix_s": 1792737801.1833625,
+      "status": "ok"
+    },
+    {
+      "run_id": "20261022T233436-07-r3-cubic",
+      "destination": "185.93.2.193:5201",
+      "rep": 3,
+      "position": 4,
+      "algorithm": "cubic",
+      "start_unix_s": 1792737812.1762974,
+      "status": "failed",
+      "error": "[Errno 111] Connection refused"
+    },
+    {
+      "run_id": "20261022T233436-07-r3-cubic",
+      "destination": "185.93.2.193:5201",
+      "rep": 3,
+      "position": 4,
+      "algorithm": "cubic",
+      "start_unix_s": 1792737814.2733707,
+      "status": "ok"
+    },
+    {
+      "run_id": "20261022T233436-08-r1-dgcc",
+      "destination": "121.127.43.65:5201",
+      "rep": 1,
+      "position": 1,
+      "algorithm": "dgcc",
+      "start_unix_s": 1792737825.2560108,
+      "status": "failed",
+      "error": "server busy or closed connection"
+    },
+    {
+      "run_id": "20261022T233436-08-r1-dgcc",
+      "destination": "121.127.43.65:5201",
+      "rep": 1,
+      "position": 1,
+      "algorithm": "dgcc",
+      "start_unix_s": 1792737827.3988967,
+      "status": "failed",
+      "error": "server busy or closed connection"
+    },
+    {
+      "run_id": "20261022T233436-09-r1-dgcc",
+      "destination": "169.150.202.193:5201",
+      "rep": 1,
+      "position": 1,
+      "algorithm": "dgcc",
+      "start_unix_s": 1792737829.5525968,
+      "status": "failed",
+      "error": "server busy or closed connection"
+    },
+    {
+      "run_id": "20261022T233436-09-r1-dgcc",
+      "destination": "169.150.202.193:5201",
+      "rep": 1,
+      "position": 1,
+      "algorithm": "dgcc",
+      "start_unix_s": 1792737831.843256,
+      "status": "failed",
+      "error": "server busy or closed connection"
+    },
+    {
+      "run_id": "20261022T233436-10-r1-dgcc",
+      "destination": "195.162.68.38:5201",
+      "rep": 1,
+      "position": 1,
+      "algorithm": "dgcc",
+      "start_unix_s": 1792737834.1385005,
+      "status": "ok"
+    },
+    {
+      "run_id": "20261022T233436-10-r1-cubic",
+      "destination": "195.162.68.38:5201",
+      "rep": 1,
+      "position": 2,
+      "algorithm": "cubic",
+      "start_unix_s": 1792737845.7647998,
+      "status": "failed",
+      "error": "[Errno 111] Connection refused"
+    },
+    {
+      "run_id": "20261022T233436-10-r1-cubic",
+      "destination": "195.162.68.38:5201",
+      "rep": 1,
+      "position": 2,
+      "algorithm": "cubic",
+      "start_unix_s": 1792737847.8930895,
+      "status": "ok"
+    },
+    {
+      "run_id": "20261022T233436-10-r1-reno",
+      "destination": "195.162.68.38:5201",
+      "rep": 1,
+      "position": 3,
+      "algorithm": "reno",
+      "start_unix_s": 1792737859.3122253,
+      "status": "failed",
+      "error": "[Errno 111] Connection refused"
+    },
+    {
+      "run_id": "20261022T233436-10-r1-reno",
+      "destination": "195.162.68.38:5201",
+      "rep": 1,
+      "position": 3,
+      "algorithm": "reno",
+      "start_unix_s": 1792737861.4233522,
+      "status": "ok"
+    },
+    {
+      "run_id": "20261022T233436-10-r1-bbr",
+      "destination": "195.162.68.38:5201",
+      "rep": 1,
+      "position": 4,
+      "algorithm": "bbr",
+      "start_unix_s": 1792737872.8616197,
+      "status": "failed",
+      "error": "[Errno 104] Connection reset by peer"
+    },
+    {
+      "run_id": "20261022T233436-10-r1-bbr",
+      "destination": "195.162.68.38:5201",
+      "rep": 1,
+      "position": 4,
+      "algorithm": "bbr",
+      "start_unix_s": 1792737875.118525,
+      "status": "ok"
+    },
+    {
+      "run_id": "20261022T233436-10-r2-cubic",
+      "destination": "195.162.68.38:5201",
+      "rep": 2,
+      "position": 1,
+      "algorithm": "cubic",
+      "start_unix_s": 1792737886.55141,
+      "status": "failed",
+      "error": "[Errno 104] Connection reset by peer"
+    },
+    {
+      "run_id": "20261022T233436-10-r2-cubic",
+      "destination": "195.162.68.38:5201",
+      "rep": 2,
+      "position": 1,
+      "algorithm": "cubic",
+      "start_unix_s": 1792737888.8201182,
+      "status": "ok"
+    },
+    {
+      "run_id": "20261022T233436-10-r2-reno",
+      "destination": "195.162.68.38:5201",
+      "rep": 2,
+      "position": 2,
+      "algorithm": "reno",
+      "start_unix_s": 1792737900.3502684,
+      "status": "ok"
+    },
+    {
+      "run_id": "20261022T233436-10-r2-bbr",
+      "destination": "195.162.68.38:5201",
+      "rep": 2,
+      "position": 3,
+      "algorithm": "bbr",
+      "start_unix_s": 1792737912.2089922,
+      "status": "failed",
+      "error": "[Errno 111] Connection refused"
+    },
+    {
+      "run_id": "20261022T233436-10-r2-bbr",
+      "destination": "195.162.68.38:5201",
+      "rep": 2,
+      "position": 3,
+      "algorithm": "bbr",
+      "start_unix_s": 1792737914.3402872,
+      "status": "ok"
+    },
+    {
+      "run_id": "20261022T233436-10-r2-dgcc",
+      "destination": "195.162.68.38:5201",
+      "rep": 2,
+      "position": 4,
+      "algorithm": "dgcc",
+      "start_unix_s": 1792737925.9517362,
+      "status": "failed",
+      "error": "[Errno 104] Connection reset by peer"
+    },
+    {
+      "run_id": "20261022T233436-10-r2-dgcc",
+      "destination": "195.162.68.38:5201",
+      "rep": 2,
+      "position": 4,
+      "algorithm": "dgcc",
+      "start_unix_s": 1792737928.1987123,
+      "status": "ok"
+    },
+    {
+      "run_id": "20261022T233436-10-r3-reno",
+      "destination": "195.162.68.38:5201",
+      "rep": 3,
+      "position": 1,
+      "algorithm": "reno",
+      "start_unix_s": 1792737939.7347488,
+      "status": "failed",
+      "error": "[Errno 111] Connection refused"
+    },
+    {
+      "run_id": "20261022T233436-10-r3-reno",
+      "destination": "195.162.68.38:5201",
+      "rep": 3,
+      "position": 1,
+      "algorithm": "reno",
+      "start_unix_s": 1792737941.8488274,
+      "status": "ok"
+    },
+    {
+      "run_id": "20261022T233436-10-r3-bbr",
+      "destination": "195.162.68.38:5201",
+      "rep": 3,
+      "position": 2,
+      "algorithm": "bbr",
+      "start_unix_s": 1792737953.825364,
+      "status": "ok"
+    },
+    {
+      "run_id": "20261022T233436-10-r3-dgcc",
+      "destination": "195.162.68.38:5201",
+      "rep": 3,
+      "position": 3,
+      "algorithm": "dgcc",
+      "start_unix_s": 1792737965.3615205,
+      "status": "ok"
+    },
+    {
+      "run_id": "20261022T233436-10-r3-cubic",
+      "destination": "195.162.68.38:5201",
+      "rep": 3,
+      "position": 4,
+      "algorithm": "cubic",
+      "start_unix_s": 1792737977.428826,
+      "status": "failed",
+      "error": "[Errno 104] Connection reset by peer"
+    },
+    {
+      "run_id": "20261022T233436-10-r3-cubic",
+      "destination": "195.162.68.38:5201",
+      "rep": 3,
+      "position": 4,
+      "algorithm": "cubic",
+      "start_unix_s": 1792737979.684105,
+      "status": "ok"
+    },
+    {
+      "run_id": "20261022T233436-11-r1-dgcc",
+      "destination": "185.180.12.40:5201",
+      "rep": 1,
+      "position": 1,
+      "algorithm": "dgcc",
+      "start_unix_s": 1792737991.2663548,
+      "status": "failed",
+      "error": "server busy or closed connection"
+    },
+    {
+      "run_id": "20261022T233436-11-r1-dgcc",
+      "destination": "185.180.12.40:5201",
+      "rep": 1,
+      "position": 1,
+      "algorithm": "dgcc",
+      "start_unix_s": 1792737993.4960637,
+      "status": "failed",
+      "error": "server busy or closed connection"
+    },
+    {
+      "run_id": "20261022T233436-12-r1-dgcc",
+      "destination": "69.48.237.66:30001",
+      "rep": 1,
+      "position": 1,
+      "algorithm": "dgcc",
+      "start_unix_s": 1792737995.727864,
+      "status": "ok"
+    },
+    {
+      "run_id": "20261022T233436-12-r1-cubic",
+      "destination": "69.48.237.66:30001",
+      "rep": 1,
+      "position": 2,
+      "algorithm": "cubic",
+      "start_unix_s": 1792738007.0821025,
+      "status": "ok"
+    },
+    {
+      "run_id": "20261022T233436-12-r1-reno",
+      "destination": "69.48.237.66:30001",
+      "rep": 1,
+      "position": 3,
+      "algorithm": "reno",
+      "start_unix_s": 1792738018.9157374,
+      "status": "ok"
+    },
+    {
+      "run_id": "20261022T233436-12-r1-bbr",
+      "destination": "69.48.237.66:30001",
+      "rep": 1,
+      "position": 4,
+      "algorithm": "bbr",
+      "start_unix_s": 1792738030.252233,
+      "status": "ok"
+    },
+    {
+      "run_id": "20261022T233436-12-r2-cubic",
+      "destination": "69.48.237.66:30001",
+      "rep": 2,
+      "position": 1,
+      "algorithm": "cubic",
+      "start_unix_s": 1792738042.0616353,
+      "status": "ok"
+    },
+    {
+      "run_id": "20261022T233436-12-r2-reno",
+      "destination": "69.48.237.66:30001",
+      "rep": 2,
+      "position": 2,
+      "algorithm": "reno",
+      "start_unix_s": 1792738053.4322467,
+      "status": "failed",
+      "error": "[Errno 104] Connection reset by peer"
+    },
+    {
+      "run_id": "20261022T233436-12-r2-reno",
+      "destination": "69.48.237.66:30001",
+      "rep": 2,
+      "position": 2,
+      "algorithm": "reno",
+      "start_unix_s": 1792738055.7111962,
+      "status": "ok"
+    },
+    {
+      "run_id": "20261022T233436-12-r2-bbr",
+      "destination": "69.48.237.66:30001",
+      "rep": 2,
+      "position": 3,
+      "algorithm": "bbr",
+      "start_unix_s": 1792738067.0951762,
+      "status": "ok"
+    },
+    {
+      "run_id": "20261022T233436-12-r2-dgcc",
+      "destination": "69.48.237.66:30001",
+      "rep": 2,
+      "position": 4,
+      "algorithm": "dgcc",
+      "start_unix_s": 1792738078.9162757,
+      "status": "ok"
+    },
+    {
+      "run_id": "20261022T233436-12-r3-reno",
+      "destination": "69.48.237.66:30001",
+      "rep": 3,
+      "position": 1,
+      "algorithm": "reno",
+      "start_unix_s": 1792738090.2520914,
+      "status": "ok"
+    },
+    {
+      "run_id": "20261022T233436-12-r3-bbr",
+      "destination": "69.48.237.66:30001",
+      "rep": 3,
+      "position": 2,
+      "algorithm": "bbr",
+      "start_unix_s": 1792738101.8544278,
+      "status": "ok"
+    },
+    {
+      "run_id": "20261022T233436-12-r3-dgcc",
+      "destination": "69.48.237.66:30001",
+      "rep": 3,
+      "position": 3,
+      "algorithm": "dgcc",
+      "start_unix_s": 1792738113.6679566,
+      "status": "ok"
+    },
+    {
+      "run_id": "20261022T233436-12-r3-cubic",
+      "destination": "69.48.237.66:30001",
+      "rep": 3,
+      "position": 4,
+      "algorithm": "cubic",
+      "start_unix_s": 1792738124.9978895,
+      "status": "failed",
+      "error": "[Errno 104] Connection reset by peer"
+    },
+    {
+      "run_id": "20261022T233436-12-r3-cubic",
+      "destination": "69.48.237.66:30001",
+      "rep": 3,
+      "position": 4,
+      "algorithm": "cubic",
+      "start_unix_s": 1792738127.2762916,
+      "status": "ok"
+    }
+  ]
+}
