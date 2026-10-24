@@ -118,7 +118,7 @@ The pseudocode left "large", "noticeable", "a few", "a percentage", and the targ
 - **Destinations:** 5 public iperf3 servers drawn at random from [`data/listed_iperf3_servers.csv`](https://github.com/CS422-Networks-Group/HW3/blob/hw3-cleanup/data/listed_iperf3_servers.csv): 23.106.226.75:5201, 80.67.167.93:9200, 185.93.2.193:5201, 195.162.68.38:5201, 69.48.237.66:30001.
 - **Duration and sampling interval:** 10 s per test, sampled every 0.25 s, for all four algorithms.
 - **Repetitions:** 3 per algorithm per destination, i.e. **15 tests per algorithm, 60 tests total**.
-- **Logged per sample** ([`tcp_sample()`](https://github.com/CS422-Networks-Group/HW3/blob/hw3-cleanup/src/main.py#L44-L76), [`results/tcp_stats.csv`](https://github.com/CS422-Networks-Group/HW3/blob/hw3-cleanup/results/tcp_stats.csv)): `snd_cwnd`, throughput (Δ`bytes_acked` × 8 / Δt), `srtt` and `min_rtt`, and the loss signal (retransmitted segments per interval).
+- **Logged per sample** ([`tcp_sample()`](https://github.com/CS422-Networks-Group/HW3/blob/hw3-cleanup/src/main.py#L44-L76), [`results/tcp_stats.csv`](https://github.com/CS422-Networks-Group/HW3/blob/hw3-cleanup/results/tcp_stats.csv)): `snd_cwnd` (our own congestion window), goodput (Δ`bytes_acked` × 8 / Δt), `srtt` and `min_rtt`, and the loss signal (retransmitted segments per interval).
 
 **Test order.** [`run_destination()`](https://github.com/CS422-Networks-Group/HW3/blob/hw3-cleanup/src/main.py#L304-L332) runs all repetitions at one destination before moving to the next. Repetition *r* uses the algorithm list rotated by *r − 1* ([`rep_order()`](https://github.com/CS422-Networks-Group/HW3/blob/hw3-cleanup/src/main.py#L299-L301)):
 
