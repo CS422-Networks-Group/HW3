@@ -1,6 +1,6 @@
 # CS 422 HW3 Report: eBPF Congestion Control (Option 1)
 
-Repository: [CS422-Networks-Group/HW3](https://github.com/CS422-Networks-Group/HW3/tree/hw3-cleanup) (branch `hw3-cleanup`). Raw measurements: [`results/`](https://github.com/CS422-Networks-Group/HW3/tree/hw3-cleanup/results). Dependencies and reproduction: [README](https://github.com/CS422-Networks-Group/HW3/blob/hw3-cleanup/README.md).
+Repository: [CS422-Networks-Group/HW3](https://github.com/CS422-Networks-Group/HW3/tree/main) (branch `main`). Raw measurements: [`results/`](https://github.com/CS422-Networks-Group/HW3/tree/hw3-cleanup/results). Dependencies and reproduction: [README](https://github.com/CS422-Networks-Group/HW3/blob/hw3-cleanup/README.md).
 
 We implemented our HW2 Q3(b) algorithm, **dgcc** (delay + goodput congestion control), as an eBPF `struct_ops` `tcp_congestion_ops` program ([`bpf/dgcc.bpf.c`](https://github.com/CS422-Networks-Group/HW3/blob/hw3-cleanup/bpf/dgcc.bpf.c)) and compared it with CUBIC, Reno, and BBR using our HW2 Python client ([`src/main.py`](https://github.com/CS422-Networks-Group/HW3/blob/hw3-cleanup/src/main.py)).
 
