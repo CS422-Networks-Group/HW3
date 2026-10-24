@@ -172,7 +172,7 @@ All plots use the same representative destination, **195.162.68.38:5201**, chose
 
 ### 4.2 Aggregate statistics
 
-Over all samples from 5 destinations × 3 repetitions ([`results/aggregate.csv`](https://github.com/CS422-Networks-Group/HW3/blob/hw3-cleanup/results/aggregate.csv), computed by [`summarize()`](https://github.com/CS422-Networks-Group/HW3/blob/hw3-cleanup/src/main.py#L347-L393)).
+Over all samples from 5 destinations × 3 repetitions ([`results/aggregate.csv`](https://github.com/CS422-Networks-Group/HW3/blob/hw3-cleanup/results/aggregate.csv), computed by [`summarize()`](https://github.com/CS422-Networks-Group/HW3/blob/hw3-cleanup/src/main.py#L347-L393)). Queueing delay is srtt − min_rtt for each sample.
 
 | | dgcc | CUBIC | Reno | BBR |
 | --- | --- | --- | --- | --- |
@@ -182,6 +182,10 @@ Over all samples from 5 destinations × 3 repetitions ([`results/aggregate.csv`]
 | srtt mean (ms) | 119.2 | 120.3 | 118.9 | 124.1 |
 | srtt median (ms) | 113.9 | 118.7 | 114.2 | 113.3 |
 | srtt p95 (ms) | 144.9 | 143.3 | 144.2 | 149.6 |
+| queueing delay median (ms) | 1.7 | 1.6 | 1.5 | 1.0 |
+| queueing delay mean (ms) | 3.0 | 4.0 | 2.7 | 7.2 |
+| queueing delay p95 (ms) | 10.1 | 10.5 | 4.9 | 8.0 |
+| retransmitted segments per test (mean) | 379 | 569 | 511 | 711 |
 
 ### 4.3 Discussion
 
@@ -191,7 +195,7 @@ Over all samples from 5 destinations × 3 repetitions ([`results/aggregate.csv`]
 | srtt | Smoothed RTT estimate | For a fixed cwnd, higher RTT means lower goodput. srtt rising above min_rtt means packets are queueing. |
 | Retransmitted segments | Our loss proxy | Each loss event makes our algorithm dynamically cut the cnwd based on the amount of extra delay.|
 
-On every path, packets were often lost (about 500 retransmitted segments per test) but rarely delayed by queueing,, so throughput depended mostly on how each algorithm adjusted cwnd based on loss. BBR does not slow down on loss (keeps the sending rate the same), so it had the highest throughput. Reno halves cwnd on each loss and regains only one segment per round trip, so it never recovered within the 10 s tests and had the lowest. With longer tests, Reno would likely have had time to rebuild cwnd and come closer to the others. CUBIC shrinks cnwd less and regrows faster, so it fell in between the algorithms. dgcc matched or beat CUBIC in 11 of 15 tests thanks to its smaller cut on random loss, but in the other 4 its start-up ended early and it grew too slowly to reach full speed, which lowered its average. RTT was similar for all four algorithms because most of it is the travel time to the server (about 110 ms), which no algorithm can change. An algorithm only adds delay by building a queue, and every algorithm’s queueing delay stayed small (1–2 ms median). BBR’s slightly higher average comes mostly from one test where its RTT spiked above 1 s before the connection timed out.
+On every path, packets were often lost (about 500 retransmitted segments per test) but rarely delayed by queueing, so throughput depended mostly on how each algorithm adjusted cwnd based on loss. BBR does not slow down on loss (keeps the sending rate the same), so it had the highest throughput. Reno halves cwnd on each loss and regains only one segment per round trip, so it never recovered within the 10 s tests and had the lowest. With longer tests, Reno would likely have had time to rebuild cwnd and come closer to the others. CUBIC shrinks cwnd less and regrows faster, so it fell in between. dgcc matched or beat CUBIC in 11 of 15 tests thanks to its smaller cut on random loss, but in the other 4 its start-up ended early and it grew too slowly to reach full speed, which lowered its average. RTT was similar for all four algorithms because most of it is the travel time to the server (about 110 ms), which no algorithm can change. An algorithm only adds delay by building a queue, and every algorithm’s queueing delay stayed small (1–2 ms median). BBR’s slightly higher average comes mostly from one test where its RTT spiked above 1 s before the connection timed out.
 
 It’s important to note that this could change if queueing delay became larger, because the algorithms have different ways of adjusting cwnd. For example, our algorithm adjusts cwnd based on how much queueing delay there is (larger queueing delay results in a larger decrease of cwnd).
 
