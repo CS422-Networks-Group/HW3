@@ -78,11 +78,22 @@ The kernel calls [`dgcc_cong_control`](https://github.com/CS422-Networks-Group/H
 
 Initial state ([`dgcc_init`](https://github.com/CS422-Networks-Group/HW3/blob/hw3-cleanup/bpf/dgcc.bpf.c#L104-L122)): cwnd = 4, start-up mode, base RTT and bandwidth unknown, ssthresh unset.
 
-Other parameters ([L23–L36](https://github.com/CS422-Networks-Group/HW3/blob/hw3-cleanup/bpf/dgcc.bpf.c#L23-L36)): minimum window 4 segments, base RTT window 10 s, bandwidth window 10 rounds, hold of 1 round after a decrease.
+| Parameter ([L23–L36](https://github.com/CS422-Networks-Group/HW3/blob/hw3-cleanup/bpf/dgcc.bpf.c#L23-L36)) | Value |
+| --- | --- |
+| Minimum window | 4 segments |
+| Delay target | base RTT / 8, clamped to [2, 20] ms |
+| Start-up exit | extra delay ≥ target / 2 |
+| Loss cut | × 0.6 if extra > target, × 0.9 otherwise |
+| Additive increase | 2–8 segments per round, 1 if the previous increase did not raise goodput |
+| Delay-based decrease | (extra − target) / (extra + target), at most 50% |
+| Base RTT window | 10 s |
+| Bandwidth window | max round goodput, kept for up to 10 rounds |
+| Upper bound | 2 × BDP |
+| Hold after a decrease | 1 round |
 
 ### 2.3 Changes from the pseudocode
 
-The pseudocode left "large", "noticeable", "a few", "a percentage", and the target unspecified; 2.1 and 2.2 give the values we chose. Other changes:
+The pseudocode left "large", "noticeable", "a few", "a percentage", and the target unspecified; the parameters above fill them in. Other changes:
 
 1. Start-up grows cwnd on every ACK instead of doubling it at the end of a round.
 2. After any decrease, the next round makes no decision, so one congestion event does not cause repeated cuts.
