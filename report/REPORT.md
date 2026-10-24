@@ -90,7 +90,7 @@ Per round, [`dgcc_round()`](https://github.com/CS422-Networks-Group/HW3/blob/hw3
 - *extra delay* = max(0, srtt − base).
 - *target* = base / 8, clamped to [2 ms, 20 ms].
 - *goodput* = (`tp->delivered` at round end − at round start) × MSS × 8 / round duration (from `tp->tcp_mstamp`).
-- The *bandwidth estimate* `max_bw` is the largest round goodput over the last 10 rounds.
+- The *bandwidth estimate* `max_bw` is the largest round goodput seen, kept for up to 10 rounds; after that it is replaced by the current round's goodput.
 
 **Step 2: Timeout.** Handled in `dgcc_set_state` (above).
 
@@ -125,7 +125,7 @@ Per-socket state is the `struct dgcc` in `icsk_ca_priv` ([L41–L57](https://git
 | Additive increase | 2–8 segments per round, 1 if the previous increase did not raise goodput |
 | Delay-based decrease | (extra − target)/(extra + target), at most 50% |
 | Base RTT window | 10 s |
-| Bandwidth window | max over 10 rounds |
+| Bandwidth window | max round goodput, kept for up to 10 rounds |
 | Upper bound | 2 × BDP |
 | Hold after a decrease | 1 round |
 
