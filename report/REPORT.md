@@ -63,16 +63,26 @@ ONCE EVERY ROUND TRIP
 
 ### 2.1 How cwnd is updated from RTT, loss, and throughput
 
-The kernel calls [`dgcc_cong_control`](https://github.com/CS422-Networks-Group/HW3/blob/hw3-cleanup/bpf/dgcc.bpf.c#L247-L281) every time an ACK arrives. Once per round trip, it calls [`dgcc_round()`](https://github.com/CS422-Networks-Group/HW3/blob/hw3-cleanup/bpf/dgcc.bpf.c#L166-L245), which follows the pseudocode:
+dgcc changes cwnd (measured in segments) once per round trip, called a *round*. The kernel calls [`dgcc_cong_control`](https://github.com/CS422-Networks-Group/HW3/blob/hw3-cleanup/bpf/dgcc.bpf.c#L247-L281) on every ACK, which records that round's lowest RTT and any losses. When the round ends, it calls [`dgcc_round()`](https://github.com/CS422-Networks-Group/HW3/blob/hw3-cleanup/bpf/dgcc.bpf.c#L166-L245) to decide the new cwnd.
 
-- **RTT** ([L173–L192](https://github.com/CS422-Networks-Group/HW3/blob/hw3-cleanup/bpf/dgcc.bpf.c#L173-L192)): the base delay is the fastest round trip we have seen. It is updated when a faster one shows up, or refreshed after 10 s. The extra delay is how far the smoothed RTT (weighted towards new measurements) is above the base delay, which tells us how much queueing our packets are causing. The target for extra delay is one eighth of the base delay, kept between 2 and 20 ms.
-- **Loss** ([L198–L208](https://github.com/CS422-Networks-Group/HW3/blob/hw3-cleanup/bpf/dgcc.bpf.c#L198-L208)): if any packets were lost during the round, dgcc cuts cwnd to 60% when the extra delay is above the target (a real queue built up), or to 90% when it is below (the loss was probably random). Either way, start-up ends.
-- **Timeout** ([`dgcc_set_state`](https://github.com/CS422-Networks-Group/HW3/blob/hw3-cleanup/bpf/dgcc.bpf.c#L148-L163)): if the connection times out, cwnd drops back to 4 segments and dgcc starts over in start-up mode.
-- **Start-up** ([L209–L214](https://github.com/CS422-Networks-Group/HW3/blob/hw3-cleanup/bpf/dgcc.bpf.c#L209-L214), [L264–L267](https://github.com/CS422-Networks-Group/HW3/blob/hw3-cleanup/bpf/dgcc.bpf.c#L264-L267)): cwnd grows by one segment for each segment acknowledged, so it doubles every round trip. Start-up ends once the extra delay reaches half the target.
-- **Below the target** ([L215–L221](https://github.com/CS422-Networks-Group/HW3/blob/hw3-cleanup/bpf/dgcc.bpf.c#L215-L221)): cwnd grows by 2 to 8 segments per round, more when the extra delay is far below the target and less as it gets close.
-- **Throughput** ([L180–L186](https://github.com/CS422-Networks-Group/HW3/blob/hw3-cleanup/bpf/dgcc.bpf.c#L180-L186), [L218–L219](https://github.com/CS422-Networks-Group/HW3/blob/hw3-cleanup/bpf/dgcc.bpf.c#L218-L219)): each round, dgcc measures goodput as the data delivered in that round divided by its length. If the last increase did not raise goodput, the path is probably already full, so cwnd grows by only 1 segment.
-- **Above the target** ([L222–L230](https://github.com/CS422-Networks-Group/HW3/blob/hw3-cleanup/bpf/dgcc.bpf.c#L222-L230)): cwnd shrinks by a fraction that grows with how far the extra delay is above the target, up to at most half.
-- **Limits** ([L232–L240](https://github.com/CS422-Networks-Group/HW3/blob/hw3-cleanup/bpf/dgcc.bpf.c#L232-L240), [L275–L279](https://github.com/CS422-Networks-Group/HW3/blob/hw3-cleanup/bpf/dgcc.bpf.c#L275-L279)): cwnd never goes below 4 segments or above about twice what the path can hold (2 × the highest recent goodput × the base delay). The highest goodput is remembered for up to 10 rounds.
+**What dgcc measures each round** ([L173–L192](https://github.com/CS422-Networks-Group/HW3/blob/hw3-cleanup/bpf/dgcc.bpf.c#L173-L192), [L180–L186](https://github.com/CS422-Networks-Group/HW3/blob/hw3-cleanup/bpf/dgcc.bpf.c#L180-L186)):
+
+- **Base delay:** the lowest RTT seen recently, i.e. our estimate of the path's delay when no queue has built up. A round with a lower RTT replaces it. If the base delay is more than 10 s old, it is replaced by the current round's lowest RTT, so it can follow a path that changes.
+- **Extra delay:** the smoothed RTT (a running average of RTT samples that weights the newest ones most) minus the base delay. This is roughly how long our packets wait in queues.
+- **Target:** the extra delay dgcc accepts, equal to the base delay / 8, but at least 2 ms and at most 20 ms. For example, a 110 ms base delay gives a 13.75 ms target.
+- **Goodput:** the data acknowledged during the round, divided by the round's length.
+
+**How cwnd changes.** The rules are checked in this order, and only the first one that applies is used:
+
+1. **Timeout** ([`dgcc_set_state`](https://github.com/CS422-Networks-Group/HW3/blob/hw3-cleanup/bpf/dgcc.bpf.c#L148-L163)): if the connection times out, cwnd drops to 4 segments and dgcc goes back to start-up. This happens immediately, not at the end of the round.
+2. **Loss** ([L198–L208](https://github.com/CS422-Networks-Group/HW3/blob/hw3-cleanup/bpf/dgcc.bpf.c#L198-L208)): if any packet was lost during the round, cwnd is cut to 60% when the extra delay is above the target (a queue overflowed), or to 90% otherwise (the loss was probably random). Start-up ends.
+3. **Start-up** ([L209–L214](https://github.com/CS422-Networks-Group/HW3/blob/hw3-cleanup/bpf/dgcc.bpf.c#L209-L214), [L264–L267](https://github.com/CS422-Networks-Group/HW3/blob/hw3-cleanup/bpf/dgcc.bpf.c#L264-L267)): cwnd grows by one segment for every segment acknowledged, which doubles it each round. Start-up ends when the extra delay reaches half the target.
+4. **Extra delay below the target** ([L215–L221](https://github.com/CS422-Networks-Group/HW3/blob/hw3-cleanup/bpf/dgcc.bpf.c#L215-L221)): cwnd grows by 8 segments when there is no extra delay, shrinking linearly to 2 segments as the extra delay approaches the target. **Throughput check** ([L218–L219](https://github.com/CS422-Networks-Group/HW3/blob/hw3-cleanup/bpf/dgcc.bpf.c#L218-L219)): if the previous round also grew cwnd but goodput did not go up, cwnd grows by only 1 segment, since a larger window is not getting more data through.
+5. **Extra delay at or above the target** ([L222–L230](https://github.com/CS422-Networks-Group/HW3/blob/hw3-cleanup/bpf/dgcc.bpf.c#L222-L230)): cwnd is cut by (extra − target) / (extra + target), at most half. For example, extra delay at 2× the target cuts cwnd by a third, and at 3× the target or more cuts it in half.
+
+After any decrease, the next round makes no change (see 2.3).
+
+**Limits** ([L232–L240](https://github.com/CS422-Networks-Group/HW3/blob/hw3-cleanup/bpf/dgcc.bpf.c#L232-L240), [L275–L279](https://github.com/CS422-Networks-Group/HW3/blob/hw3-cleanup/bpf/dgcc.bpf.c#L275-L279)): cwnd always stays at or above 4 segments. Outside start-up, it also stays at or below twice the path's bandwidth-delay product, i.e. 2 × the highest recent round goodput × the base delay. The highest goodput is kept for up to 10 rounds.
 
 ### 2.2 Initial state and parameters
 
