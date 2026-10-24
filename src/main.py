@@ -421,7 +421,7 @@ def plot_tcp_stats(d_data: pd.DataFrame, algorithm: str, out: str, duration: flo
                                  "retransmitted\nsegments / interval", "goodput (Mbit/s)"]):
         ax.set_ylim(lims[field])
         ax.set_ylabel(label)
-        ax.set_xlabel("time (s)")
+        ax.set_xlabel("time (seconds)")
         ax.tick_params(labelbottom=True)
         ax.grid(alpha=0.3)
     axes[0].legend(loc="upper right", fontsize=8)
@@ -441,7 +441,7 @@ def plot_tcp_stats(d_data: pd.DataFrame, algorithm: str, out: str, duration: flo
         ax.grid(alpha=0.3)
     axes[0].set_ylim(lims["goodput_mbps"])
     axes[0].set_ylabel("goodput (Mbit/s)")
-    fig.colorbar(sc, ax=axes, label="time (s)")
+    fig.colorbar(sc, ax=axes, label="time (seconds)")
     fig.suptitle(f"TCP stats vs goodput: {dest} ({algorithm}, all repetitions)")
     save(fig, out, f"tcp_stats_scatter_{algorithm}")
 
