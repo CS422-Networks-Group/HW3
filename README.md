@@ -29,15 +29,13 @@ sudo make -C bpf unload     # bpftool struct_ops unregister name dgcc
 ```
 
 `load` sets `net.ipv4.tcp_allowed_congestion_control` so the unprivileged Python client can select every
-algorithm. `bpf/Makefile` uses `/usr/lib/linux-tools/<version>/bpftool` directly, because Ubuntu's
-`/usr/sbin/bpftool` wrapper refuses to run when no `linux-tools` package matches the running (WSL2) kernel.
+algorithm.
 
 ## Running the experiments
 
 ```
 scripts/run_all.sh                      # build + load if needed, run all tests, write tables + plots to results/
 scripts/run_all.sh --n 5 --reps 3       # any src/main.py option can be appended
-.venv/bin/python src/main.py --replot   # rebuild tables and plots from results/tcp_stats.csv
 ```
 
 | option | meaning |
@@ -52,23 +50,3 @@ scripts/run_all.sh --n 5 --reps 3       # any src/main.py option can be appended
 | `--max-attempts` | servers tried before reporting a shortfall (default 40) |
 | `--seed` | seed for the server shuffle (saved in `run_metadata.json`) |
 | `--out` | output directory (default `results`) |
-| `--replot` | skip measurements and rebuild outputs from `<out>/tcp_stats.csv` |
-
-Test order: for each destination, repetition *r* runs the algorithm list rotated by *r − 1*
-(rep 1: dgcc, cubic, reno, bbr; rep 2: cubic, reno, bbr, dgcc; ...), so each algorithm runs in each position
-equally often. Every test's start time, position, and outcome is in `run_metadata.json`.
-
-### Outputs (`results/`; PNG copies of the plots go to `report/figures/`)
-
-| file | contents |
-|---|---|
-| `tcp_stats.csv` | one row per sample: run id, destination, rep, position, algorithm, goodput, decoded `TCP_INFO` |
-| `runs.csv` | one row per test: mean goodput, srtt, queueing delay, retransmissions, RTO flag, goodput / CUBIC |
-| `summary.csv` | HW2 Q1(c): goodput min / median / mean / p95 (and srtt) per destination and algorithm |
-| `aggregate.csv` | goodput, srtt, and queueing-delay statistics per algorithm over all destinations and reps |
-| `run_metadata.json` | session, kernel, seed, destinations, test order, and every test attempted |
-| `goodput_<alg>.pdf` | HW2 Q1(c): goodput over time at every destination, one file per algorithm |
-| `tcp_stats_timeseries_<alg>.pdf` | HW2 Q2(b)(i) at the representative destination (median mean goodput) |
-| `tcp_stats_scatter_<alg>.pdf` | HW2 Q2(b)(ii) at the same destination |
-
-Percentiles use pandas' default linear interpolation between closest ranks (numpy `linear`, Hyndman–Fan type 7).

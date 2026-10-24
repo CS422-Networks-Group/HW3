@@ -14,7 +14,6 @@ import matplotlib.pyplot as plt
 
 #dgcc is the BPF struct_ops algorithm in bpf/dgcc.bpf.c; the others are the kernel's built-in modules
 DEFAULT_CONGESTION_ALGORITHMS = ("dgcc", "cubic", "reno", "bbr")
-ALGORITHM_COLORS = {"dgcc": "tab:red", "cubic": "tab:blue", "reno": "tab:green", "bbr": "tab:purple"}
 
 #linux struct tcp_info (include/uapi/linux/tcp.h), decoded up to tcpi_snd_wnd (232 bytes, kernel 5.4+)
 #8 u8 header fields, 24 u32, then the u64/u32 extensions in kernel order. "=" = native byte order, no padding
@@ -293,11 +292,6 @@ def parse_args():
         default=list(DEFAULT_CONGESTION_ALGORITHMS),
         help="congestion-control algorithms to compare (default: dgcc cubic reno bbr)"
     )
-    parser.add_argument(
-        "--replot",
-        action="store_true",
-        help="skip the measurements; rebuild the tables and plots from <out>/tcp_stats.csv"
-    )
     return parser.parse_args()
 
 #test order for one repetition: the algorithm list rotated by one position per repetition, so every
@@ -398,7 +392,7 @@ def summarize(data: pd.DataFrame, algorithms, out: str):
     agg.round(3).to_csv(os.path.join(out, "aggregate.csv"))
     print(agg.round(2).T)
 
-#pdf to the output directory with the other results, png copy to report/figures for the report (as in HW2)
+#pdf to the output directory with the other results, png copy to report/figures for the report
 FIGURES = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "report", "figures")
 
 def save(fig, out, name):
@@ -450,26 +444,6 @@ def plot_tcp_stats(d_data: pd.DataFrame, algorithm: str, out: str, duration: flo
     fig.suptitle(f"TCP stats vs goodput: {dest} ({algorithm}, all repetitions)")
     save(fig, out, f"tcp_stats_scatter_{algorithm}")
 
-#q1(c): goodput over time at every destination for one algorithm, one line per repetition
-def plot_goodput(data: pd.DataFrame, algorithm: str, out: str, lims: dict):
-    a_data = data[data["algorithm"] == algorithm]
-    destinations = list(dict.fromkeys(data["destination"]))
-    fig, axes = plt.subplots(len(destinations), 1, figsize=(8, 2.5 * len(destinations)), sharex=True, squeeze=False,
-                             layout="constrained")
-    for ax, destination in zip(axes[:, 0], destinations):
-        for rep, d in a_data[a_data["destination"] == destination].groupby("rep"):
-            d = d.sort_values("time_s")
-            ax.plot(d["time_s"], d["goodput_bps"] / 1e6, color=plt.cm.tab10(rep - 1), label=f"rep {rep}")
-        ax.set_title(destination)
-        ax.set_ylabel("Mbit/s")
-        ax.set_ylim(lims["goodput_mbps"])
-        ax.grid(alpha=0.3)
-    axes[0, 0].legend(loc="lower right", fontsize=8)
-    axes[-1, 0].set_xlim(lims["time_s"])
-    axes[-1, 0].set_xlabel("time (s)")
-    fig.suptitle(f"Goodput over time ({algorithm})")
-    save(fig, out, f"goodput_{algorithm}")
-
 def analyze(data: pd.DataFrame, algorithms, out: str, duration: float):
     algorithms = [a for a in algorithms if a in set(data["algorithm"])]
     summarize(data, algorithms, out)
@@ -484,7 +458,6 @@ def analyze(data: pd.DataFrame, algorithms, out: str, duration: float):
             "retrans_segs": (0, max(rep_data["retrans_segs"].max(), 1) * 1.05),
             "srtt_ms": (rep_data["min_rtt_ms"].min() * 0.95, rep_data["srtt_ms"].max() * 1.05)}
     for algorithm in algorithms:
-        plot_goodput(data, algorithm, out, lims)
         plot_tcp_stats(rep_data[rep_data["algorithm"] == algorithm], algorithm, out, duration, lims)
 
 #main test runner
@@ -493,14 +466,6 @@ def main():
     # Preserve the requested order while preventing duplicate runs/plots.
     algorithms = list(dict.fromkeys(args.algorithms))
     os.makedirs(args.out, exist_ok=True)
-    if args.replot:
-        meta_path = os.path.join(args.out, "run_metadata.json")
-        duration = args.time
-        if os.path.exists(meta_path):
-            with open(meta_path) as f:
-                duration = json.load(f)["time_s"]
-        analyze(pd.read_csv(os.path.join(args.out, "tcp_stats.csv")), algorithms, args.out, duration)
-        return
     try:
         validate_congestion_algorithms(algorithms)
     except RuntimeError as e:

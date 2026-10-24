@@ -23,7 +23,7 @@ sudo make -C bpf unload # bpftool struct_ops unregister name dgcc
 
 Targets are in [`bpf/Makefile`](https://github.com/CS422-Networks-Group/HW3/blob/hw3-cleanup/bpf/Makefile). Registration passes the kernel's BPF verifier; `dgcc` then appears in `tcp_available_congestion_control`, and the `sysctl` lets an unprivileged process select it with `setsockopt(TCP_CONGESTION)`.
 
-**Selecting and recording the algorithm.** [`set_congestion_control()`](https://github.com/CS422-Networks-Group/HW3/blob/hw3-cleanup/src/main.py#L110-L125) sets `TCP_CONGESTION` on the iperf3 *data* socket before `connect()` and reads it back. After the 10 s transfer, [`iperf3_test()`](https://github.com/CS422-Networks-Group/HW3/blob/hw3-cleanup/src/main.py#L203-L204) reads `TCP_CONGESTION` from the established connection again. That value goes in the `algorithm` column of every sample, and the test fails if it differs from the requested algorithm. All 60 tests reported the requested algorithm.
+**Selecting and recording the algorithm.** [`set_congestion_control()`](https://github.com/CS422-Networks-Group/HW3/blob/hw3-cleanup/src/main.py#L109-L124) sets `TCP_CONGESTION` on the iperf3 *data* socket before `connect()` and reads it back. After the 10 s transfer, [`iperf3_test()`](https://github.com/CS422-Networks-Group/HW3/blob/hw3-cleanup/src/main.py#L202-L203) reads `TCP_CONGESTION` from the established connection again. That value goes in the `algorithm` column of every sample, and the test fails if it differs from the requested algorithm. All 60 tests reported the requested algorithm.
 
 ## 2. Implementation
 
@@ -140,18 +140,9 @@ The pseudocode left "large", "noticeable", "a few", "a percentage", and the targ
 5. **Pacing rate** is maintained (see 2.2). The pseudocode does not mention pacing.
 6. **Timeout** is detected via the kernel's transition to `TCP_CA_Loss` (RTO), not inside the per-round logic, so it takes effect immediately.
 
-### 2.5 Fairness and convergence (expected, not measured)
-
-- **dgcc vs dgcc.** Flows sharing a bottleneck see the same queueing delay, so they are below or above the target together. Below it each adds 2–8 segments per round; above it each removes the same fraction of its window. Additive increase with proportional decrease moves windows toward equal shares (Chiu and Jain, 1989), and the total rate oscillates around the point where extra delay ≈ target rather than settling on one value.
-- **RTT unfairness.** Increases happen once per round, so shorter-RTT flows grow faster and get more bandwidth, as with Reno.
-- **Late arrivals.** A flow that starts while a queue exists measures that queued RTT as its base delay, sees less extra delay than the others, and takes more than its share, the same problem TCP Vegas has.
-- **dgcc vs CUBIC/Reno.** Loss-based flows fill the buffer until loss. dgcc sees extra delay above target and keeps backing off, so on a deep-buffer bottleneck it gets less than its share.
-
-These rest on our assumptions that the minimum RTT is the propagation delay, that RTT growth comes from queueing, and that loss with little extra delay is random. Our tests ran one flow at a time, so none of this was measured.
-
 ## 3. Experiment
 
-**Method.** We used the HW2 client unchanged except for the algorithm list, repetitions, and duration: an iperf3 control and data connection, 128 KiB `sendall()` blocks, and `TCP_INFO` read from the data socket. Every algorithm used the same settings:
+**Method.** We used the HW2 client's iperf3 protocol and measurement code (128 KiB `sendall()` blocks, `TCP_INFO` read from the data socket), with dgcc added to the algorithm list. Every algorithm used the same settings:
 
 - **Destinations:** 5 public iperf3 servers, drawn at random from [`data/listed_iperf3_servers.csv`](https://github.com/CS422-Networks-Group/HW3/blob/hw3-cleanup/data/listed_iperf3_servers.csv) (shuffle seed `3624686937`).
 - **Duration:** 10 s per test.
@@ -160,7 +151,7 @@ These rest on our assumptions that the minimum RTT is the propagation delay, tha
 
 Session `20261022T233436`, run on 2026-10-22 from 23:34 for 14.2 minutes.
 
-**Test order.** [`run_destination()`](https://github.com/CS422-Networks-Group/HW3/blob/hw3-cleanup/src/main.py#L310-L338) runs all repetitions for one destination before moving to the next. Within a destination, repetition *r* uses the algorithm list rotated by *r − 1* ([`rep_order()`](https://github.com/CS422-Networks-Group/HW3/blob/hw3-cleanup/src/main.py#L305-L307)):
+**Test order.** [`run_destination()`](https://github.com/CS422-Networks-Group/HW3/blob/hw3-cleanup/src/main.py#L304-L332) runs all repetitions for one destination before moving to the next. Within a destination, repetition *r* uses the algorithm list rotated by *r − 1* ([`rep_order()`](https://github.com/CS422-Networks-Group/HW3/blob/hw3-cleanup/src/main.py#L299-L301)):
 
 | Rep | Order |
 | --- | --- |
@@ -174,20 +165,20 @@ Destinations, in test order: 23.106.226.75:5201, 80.67.167.93:9200, 185.93.2.193
 
 **Failures.** A destination was kept only if all 12 of its tests succeeded. A failed test was retried once after 2 s, because many servers briefly refuse a new test right after the previous one ends. 12 servers were tried to get 5. At the 5 kept destinations, 38 tests failed once (20 connection resets, 18 refusals) and all succeeded on retry. 7 servers were dropped: 5 reported "busy" twice, 1 refused twice, and 1 (217.18.95.142) reset twice on its 6th test, so its 5 completed tests were discarded. Every attempt and its outcome is listed in [`results/run_metadata.json`](https://github.com/CS422-Networks-Group/HW3/blob/hw3-cleanup/results/run_metadata.json).
 
-**Logged per sample** ([`tcp_sample()`](https://github.com/CS422-Networks-Group/HW3/blob/hw3-cleanup/src/main.py#L45-L77), [`results/tcp_stats.csv`](https://github.com/CS422-Networks-Group/HW3/blob/hw3-cleanup/results/tcp_stats.csv)):
+**Logged per sample** ([`tcp_sample()`](https://github.com/CS422-Networks-Group/HW3/blob/hw3-cleanup/src/main.py#L44-L76), [`results/tcp_stats.csv`](https://github.com/CS422-Networks-Group/HW3/blob/hw3-cleanup/results/tcp_stats.csv)):
 
 - `snd_cwnd`
 - goodput (Δ`bytes_acked` × 8 / Δt)
 - `srtt`, `rttvar`, `min_rtt`
 - **loss signal:**
-    - retransmitted segments per interval (Δ`total_retrans`), as in HW2
+    - retransmitted segments per interval (Δ`total_retrans`)
     - `lost` segments
     - `ca_state` (Recovery = 3, Loss = 4)
     - `retransmits` (RTO back-offs)
 
-`TCP_INFO` is read with `getsockopt()` and decoded by [`tcp_info()`](https://github.com/CS422-Networks-Group/HW3/blob/hw3-cleanup/src/main.py#L19-L41) as Linux `struct tcp_info` up to `tcpi_snd_wnd` (232 bytes, kernel ≥ 5.4; `struct` format `=8B24I4Q6IQ3Q2I2Q2I2I`, native byte order). Each sample differences the cumulative counters (`bytes_acked`, `total_retrans`, `data_segs_out`) against the previous read and divides by the measured elapsed time, not the nominal interval. Units are in the column names (`_bps`, `_ms`, `_segs`).
+`TCP_INFO` is read with `getsockopt()` and decoded by [`tcp_info()`](https://github.com/CS422-Networks-Group/HW3/blob/hw3-cleanup/src/main.py#L18-L40) as Linux `struct tcp_info` up to `tcpi_snd_wnd` (232 bytes, kernel ≥ 5.4; `struct` format `=8B24I4Q6IQ3Q2I2Q2I2I`, native byte order). Each sample differences the cumulative counters (`bytes_acked`, `total_retrans`, `data_segs_out`) against the previous read and divides by the measured elapsed time, not the nominal interval. Units are in the column names (`_bps`, `_ms`, `_segs`).
 
-**Reproduction.** [`scripts/run_all.sh`](https://github.com/CS422-Networks-Group/HW3/blob/hw3-cleanup/scripts/run_all.sh) builds and loads dgcc if needed, runs all tests, and writes every table and plot. `src/main.py --replot` rebuilds the tables and plots from `results/tcp_stats.csv` without running new tests. The results in this report came from:
+**Reproduction.** [`scripts/run_all.sh`](https://github.com/CS422-Networks-Group/HW3/blob/hw3-cleanup/scripts/run_all.sh) builds and loads dgcc if needed, runs all tests, and writes every table and plot. The results in this report came from:
 
 ```
 .venv/bin/python src/main.py --n 5 --reps 3 --out results   # --time 10 --interval 0.25
@@ -197,56 +188,47 @@ Destinations, in test order: 23.106.226.75:5201, 80.67.167.93:9200, 185.93.2.193
 
 ### 4.1 Time series and scatter plots (representative destination)
 
-The representative destination, chosen by [`pick_representative()`](https://github.com/CS422-Networks-Group/HW3/blob/hw3-cleanup/src/main.py#L341-L344), is **195.162.68.38:5201**: its mean goodput, averaged over the four algorithms, is the median across destinations. Its per-test min RTT was 105–130 ms. All four algorithms are plotted for the same destination, one figure per algorithm, with one line per repetition. Each axis has the same range in all four algorithms' figures ([`analyze()`](https://github.com/CS422-Networks-Group/HW3/blob/hw3-cleanup/src/main.py#L481-L485)), so they can be compared directly.
-
-What the plotted metrics mean, and how they should affect goodput in congestion avoidance:
-
-- **snd_cwnd**: the most unacknowledged segments the sender may have. When window-limited, goodput ≈ cwnd × MSS / RTT, so goodput follows cwnd until the bottleneck is full; beyond that, a larger cwnd only adds queueing delay.
-- **srtt** (solid) and **min_rtt** (dashed): srtt − min_rtt approximates queueing delay. srtt rising while goodput stays flat means cwnd is above the path's BDP.
-- **Retransmitted segments per interval** (loss proxy): CUBIC and Reno cut cwnd after loss, so retransmission spikes come just before goodput drops. BBR does not treat loss as a congestion signal; dgcc cuts by 10% or 40% depending on extra delay.
-- **Goodput**: Δ`bytes_acked` × 8 / Δt, the rate the receiver acknowledged.
-
-Anomalies (start-up overshoot, BBR's timeout) are discussed in 4.3.
+The representative destination, chosen by [`pick_representative()`](https://github.com/CS422-Networks-Group/HW3/blob/hw3-cleanup/src/main.py#L335-L338), is **195.162.68.38:5201**: its mean goodput, averaged over the four algorithms, is the median across destinations. Its per-test min RTT was 105–130 ms. All four algorithms are plotted for the same destination, one figure per algorithm, with one line per repetition. Each axis has the same range in all four algorithms' figures ([`analyze()`](https://github.com/CS422-Networks-Group/HW3/blob/hw3-cleanup/src/main.py#L455-L459)), so they can be compared directly.
 
 #### TCP stats over time (195.162.68.38:5201)
 
 ![TCP stats over time, dgcc](figures/tcp_stats_timeseries_dgcc.png)
 
-*Figure 1a: snd_cwnd, RTT (srtt solid, min_rtt dashed), retransmitted segments per interval, and goodput over time (dgcc). Source: [`results/tcp_stats_timeseries_dgcc.pdf`](https://github.com/CS422-Networks-Group/HW3/blob/hw3-cleanup/results/tcp_stats_timeseries_dgcc.pdf). Generated by [`plot_tcp_stats()`](https://github.com/CS422-Networks-Group/HW3/blob/hw3-cleanup/src/main.py#L412-L451).*
+*Figure 1a: snd_cwnd, RTT (srtt solid, min_rtt dashed), retransmitted segments per interval, and goodput over time (dgcc). Source: [`results/tcp_stats_timeseries_dgcc.pdf`](https://github.com/CS422-Networks-Group/HW3/blob/hw3-cleanup/results/tcp_stats_timeseries_dgcc.pdf). Generated by [`plot_tcp_stats()`](https://github.com/CS422-Networks-Group/HW3/blob/hw3-cleanup/src/main.py#L406-L445).*
 
 ![TCP stats over time, CUBIC](figures/tcp_stats_timeseries_cubic.png)
 
-*Figure 1b: snd_cwnd, RTT (srtt solid, min_rtt dashed), retransmitted segments per interval, and goodput over time (CUBIC). Source: [`results/tcp_stats_timeseries_cubic.pdf`](https://github.com/CS422-Networks-Group/HW3/blob/hw3-cleanup/results/tcp_stats_timeseries_cubic.pdf). Generated by [`plot_tcp_stats()`](https://github.com/CS422-Networks-Group/HW3/blob/hw3-cleanup/src/main.py#L412-L451).*
+*Figure 1b: snd_cwnd, RTT (srtt solid, min_rtt dashed), retransmitted segments per interval, and goodput over time (CUBIC). Source: [`results/tcp_stats_timeseries_cubic.pdf`](https://github.com/CS422-Networks-Group/HW3/blob/hw3-cleanup/results/tcp_stats_timeseries_cubic.pdf). Generated by [`plot_tcp_stats()`](https://github.com/CS422-Networks-Group/HW3/blob/hw3-cleanup/src/main.py#L406-L445).*
 
 ![TCP stats over time, Reno](figures/tcp_stats_timeseries_reno.png)
 
-*Figure 1c: snd_cwnd, RTT (srtt solid, min_rtt dashed), retransmitted segments per interval, and goodput over time (Reno). Source: [`results/tcp_stats_timeseries_reno.pdf`](https://github.com/CS422-Networks-Group/HW3/blob/hw3-cleanup/results/tcp_stats_timeseries_reno.pdf). Generated by [`plot_tcp_stats()`](https://github.com/CS422-Networks-Group/HW3/blob/hw3-cleanup/src/main.py#L412-L451).*
+*Figure 1c: snd_cwnd, RTT (srtt solid, min_rtt dashed), retransmitted segments per interval, and goodput over time (Reno). Source: [`results/tcp_stats_timeseries_reno.pdf`](https://github.com/CS422-Networks-Group/HW3/blob/hw3-cleanup/results/tcp_stats_timeseries_reno.pdf). Generated by [`plot_tcp_stats()`](https://github.com/CS422-Networks-Group/HW3/blob/hw3-cleanup/src/main.py#L406-L445).*
 
 ![TCP stats over time, BBR](figures/tcp_stats_timeseries_bbr.png)
 
-*Figure 1d: snd_cwnd, RTT (srtt solid, min_rtt dashed), retransmitted segments per interval, and goodput over time (BBR). Source: [`results/tcp_stats_timeseries_bbr.pdf`](https://github.com/CS422-Networks-Group/HW3/blob/hw3-cleanup/results/tcp_stats_timeseries_bbr.pdf). Generated by [`plot_tcp_stats()`](https://github.com/CS422-Networks-Group/HW3/blob/hw3-cleanup/src/main.py#L412-L451).*
+*Figure 1d: snd_cwnd, RTT (srtt solid, min_rtt dashed), retransmitted segments per interval, and goodput over time (BBR). Source: [`results/tcp_stats_timeseries_bbr.pdf`](https://github.com/CS422-Networks-Group/HW3/blob/hw3-cleanup/results/tcp_stats_timeseries_bbr.pdf). Generated by [`plot_tcp_stats()`](https://github.com/CS422-Networks-Group/HW3/blob/hw3-cleanup/src/main.py#L406-L445).*
 
 #### TCP stats vs goodput (195.162.68.38:5201)
 
 ![TCP stats vs goodput, dgcc](figures/tcp_stats_scatter_dgcc.png)
 
-*Figure 2a: snd_cwnd, srtt, and retransmitted segments vs goodput, all 3 repetitions, colored by time (dgcc). Source: [`results/tcp_stats_scatter_dgcc.pdf`](https://github.com/CS422-Networks-Group/HW3/blob/hw3-cleanup/results/tcp_stats_scatter_dgcc.pdf). Generated by [`plot_tcp_stats()`](https://github.com/CS422-Networks-Group/HW3/blob/hw3-cleanup/src/main.py#L412-L451).*
+*Figure 2a: snd_cwnd, srtt, and retransmitted segments vs goodput, all 3 repetitions, colored by time (dgcc). Source: [`results/tcp_stats_scatter_dgcc.pdf`](https://github.com/CS422-Networks-Group/HW3/blob/hw3-cleanup/results/tcp_stats_scatter_dgcc.pdf). Generated by [`plot_tcp_stats()`](https://github.com/CS422-Networks-Group/HW3/blob/hw3-cleanup/src/main.py#L406-L445).*
 
 ![TCP stats vs goodput, CUBIC](figures/tcp_stats_scatter_cubic.png)
 
-*Figure 2b: snd_cwnd, srtt, and retransmitted segments vs goodput, all 3 repetitions, colored by time (CUBIC). Source: [`results/tcp_stats_scatter_cubic.pdf`](https://github.com/CS422-Networks-Group/HW3/blob/hw3-cleanup/results/tcp_stats_scatter_cubic.pdf). Generated by [`plot_tcp_stats()`](https://github.com/CS422-Networks-Group/HW3/blob/hw3-cleanup/src/main.py#L412-L451).*
+*Figure 2b: snd_cwnd, srtt, and retransmitted segments vs goodput, all 3 repetitions, colored by time (CUBIC). Source: [`results/tcp_stats_scatter_cubic.pdf`](https://github.com/CS422-Networks-Group/HW3/blob/hw3-cleanup/results/tcp_stats_scatter_cubic.pdf). Generated by [`plot_tcp_stats()`](https://github.com/CS422-Networks-Group/HW3/blob/hw3-cleanup/src/main.py#L406-L445).*
 
 ![TCP stats vs goodput, Reno](figures/tcp_stats_scatter_reno.png)
 
-*Figure 2c: snd_cwnd, srtt, and retransmitted segments vs goodput, all 3 repetitions, colored by time (Reno). Source: [`results/tcp_stats_scatter_reno.pdf`](https://github.com/CS422-Networks-Group/HW3/blob/hw3-cleanup/results/tcp_stats_scatter_reno.pdf). Generated by [`plot_tcp_stats()`](https://github.com/CS422-Networks-Group/HW3/blob/hw3-cleanup/src/main.py#L412-L451).*
+*Figure 2c: snd_cwnd, srtt, and retransmitted segments vs goodput, all 3 repetitions, colored by time (Reno). Source: [`results/tcp_stats_scatter_reno.pdf`](https://github.com/CS422-Networks-Group/HW3/blob/hw3-cleanup/results/tcp_stats_scatter_reno.pdf). Generated by [`plot_tcp_stats()`](https://github.com/CS422-Networks-Group/HW3/blob/hw3-cleanup/src/main.py#L406-L445).*
 
 ![TCP stats vs goodput, BBR](figures/tcp_stats_scatter_bbr.png)
 
-*Figure 2d: snd_cwnd, srtt, and retransmitted segments vs goodput, all 3 repetitions, colored by time (BBR). Source: [`results/tcp_stats_scatter_bbr.pdf`](https://github.com/CS422-Networks-Group/HW3/blob/hw3-cleanup/results/tcp_stats_scatter_bbr.pdf). Generated by [`plot_tcp_stats()`](https://github.com/CS422-Networks-Group/HW3/blob/hw3-cleanup/src/main.py#L412-L451).*
+*Figure 2d: snd_cwnd, srtt, and retransmitted segments vs goodput, all 3 repetitions, colored by time (BBR). Source: [`results/tcp_stats_scatter_bbr.pdf`](https://github.com/CS422-Networks-Group/HW3/blob/hw3-cleanup/results/tcp_stats_scatter_bbr.pdf). Generated by [`plot_tcp_stats()`](https://github.com/CS422-Networks-Group/HW3/blob/hw3-cleanup/src/main.py#L406-L445).*
 
 ### 4.2 Aggregate statistics
 
-All samples from all 5 destinations × 3 repetitions ([`results/aggregate.csv`](https://github.com/CS422-Networks-Group/HW3/blob/hw3-cleanup/results/aggregate.csv), computed by [`summarize()`](https://github.com/CS422-Networks-Group/HW3/blob/hw3-cleanup/src/main.py#L353-L399)). Goodput is in Mbit/s, RTT in ms. Queueing delay is srtt − min_rtt per sample. "Run mean ± std" is over the 15 per-test means. "vs CUBIC" is each test's mean goodput divided by the CUBIC mean at the same destination, averaged over the 15 tests.
+All samples from all 5 destinations × 3 repetitions ([`results/aggregate.csv`](https://github.com/CS422-Networks-Group/HW3/blob/hw3-cleanup/results/aggregate.csv), computed by [`summarize()`](https://github.com/CS422-Networks-Group/HW3/blob/hw3-cleanup/src/main.py#L347-L393)). Goodput is in Mbit/s, RTT in ms. Queueing delay is srtt − min_rtt per sample. "Run mean ± std" is over the 15 per-test means. "vs CUBIC" is each test's mean goodput divided by the CUBIC mean at the same destination, averaged over the 15 tests.
 
 **Throughput (Mbit/s).** Percentiles are over samples.
 
@@ -274,50 +256,9 @@ All samples from all 5 destinations × 3 repetitions ([`results/aggregate.csv`](
 
 Percentiles use pandas' default linear interpolation between closest ranks (numpy `linear`, Hyndman–Fan type 7).
 
-**Goodput per destination (Mbit/s)**, over all samples of the 3 repetitions ([`results/summary.csv`](https://github.com/CS422-Networks-Group/HW3/blob/hw3-cleanup/results/summary.csv), which also has srtt; per-test means are in [`results/runs.csv`](https://github.com/CS422-Networks-Group/HW3/blob/hw3-cleanup/results/runs.csv)):
-
-| Destination | Algorithm | min | median | mean | p95 |
-| --- | --- | --- | --- | --- | --- |
-| 23.106.226.75:5201 | dgcc | 0.5 | 145.8 | 93.8 | 158.6 |
-|  | CUBIC | 0.3 | 154.4 | 129.8 | 159.5 |
-|  | Reno | 1.1 | 83.7 | 100.3 | 157.0 |
-|  | BBR | 0.6 | 151.1 | 129.7 | 159.0 |
-| 80.67.167.93:9200 | dgcc | 1.3 | 208.0 | 185.2 | 229.9 |
-|  | CUBIC | 1.3 | 213.9 | 159.9 | 231.9 |
-|  | Reno | 1.3 | 119.0 | 115.8 | 227.2 |
-|  | BBR | 1.3 | 209.0 | 183.2 | 237.9 |
-| 185.93.2.193:5201 | dgcc | 0.7 | 218.0 | 153.7 | 246.8 |
-|  | CUBIC | 1.4 | 218.3 | 181.9 | 238.8 |
-|  | Reno | 1.3 | 115.0 | 116.5 | 226.0 |
-|  | BBR | 1.7 | 229.9 | 203.2 | 242.0 |
-| 195.162.68.38:5201 | dgcc | 0.7 | 144.7 | 121.6 | 237.8 |
-|  | CUBIC | 1.3 | 101.6 | 115.7 | 219.1 |
-|  | Reno | 1.2 | 165.0 | 138.4 | 230.1 |
-|  | BBR | 2.0 | 163.5 | 152.1 | 222.1 |
-| 69.48.237.66:30001 | dgcc | 0.6 | 107.1 | 96.3 | 163.6 |
-|  | CUBIC | 0.6 | 141.4 | 119.6 | 162.9 |
-|  | Reno | 0.6 | 157.3 | 114.4 | 163.3 |
-|  | BBR | 0.6 | 74.6 | 83.0 | 162.0 |
-
-![Goodput over time, dgcc](figures/goodput_dgcc.png)
-
-*Figure 3a: Goodput over time per destination, one line per repetition (dgcc). Source: [`results/goodput_dgcc.pdf`](https://github.com/CS422-Networks-Group/HW3/blob/hw3-cleanup/results/goodput_dgcc.pdf). Generated by [`plot_goodput()`](https://github.com/CS422-Networks-Group/HW3/blob/hw3-cleanup/src/main.py#L454-L471).*
-
-![Goodput over time, CUBIC](figures/goodput_cubic.png)
-
-*Figure 3b: Goodput over time per destination, one line per repetition (CUBIC). Source: [`results/goodput_cubic.pdf`](https://github.com/CS422-Networks-Group/HW3/blob/hw3-cleanup/results/goodput_cubic.pdf). Generated by [`plot_goodput()`](https://github.com/CS422-Networks-Group/HW3/blob/hw3-cleanup/src/main.py#L454-L471).*
-
-![Goodput over time, Reno](figures/goodput_reno.png)
-
-*Figure 3c: Goodput over time per destination, one line per repetition (Reno). Source: [`results/goodput_reno.pdf`](https://github.com/CS422-Networks-Group/HW3/blob/hw3-cleanup/results/goodput_reno.pdf). Generated by [`plot_goodput()`](https://github.com/CS422-Networks-Group/HW3/blob/hw3-cleanup/src/main.py#L454-L471).*
-
-![Goodput over time, BBR](figures/goodput_bbr.png)
-
-*Figure 3d: Goodput over time per destination, one line per repetition (BBR). Source: [`results/goodput_bbr.pdf`](https://github.com/CS422-Networks-Group/HW3/blob/hw3-cleanup/results/goodput_bbr.pdf). Generated by [`plot_goodput()`](https://github.com/CS422-Networks-Group/HW3/blob/hw3-cleanup/src/main.py#L454-L471).*
-
 ### 4.3 Discussion
 
-**The paths.** All five destinations have a min RTT of 88–133 ms, and every algorithm's p95 goodput per destination was 157–247 Mbit/s. A cwnd of 4000 segments at 110 ms would carry 420 Mbit/s, so this ceiling was not a window limit. It is more likely a rate limit on the public servers or a shared bottleneck we can't see. Queueing delay was small for every algorithm (medians of 1–2 ms), even though every algorithm saw losses. This suggests the bottlenecks have shallow buffers or police the rate: losses arrive before a large queue does.
+**The paths.** All five destinations have a min RTT of 88–133 ms, and every algorithm's p95 goodput per destination was 157–247 Mbit/s ([`results/summary.csv`](https://github.com/CS422-Networks-Group/HW3/blob/hw3-cleanup/results/summary.csv)). A cwnd of 4000 segments at 110 ms would carry 420 Mbit/s, so this ceiling was not a window limit. It is more likely a rate limit on the public servers or a shared bottleneck we can't see. Queueing delay was small for every algorithm (medians of 1–2 ms), even though every algorithm saw losses. This suggests the bottlenecks have shallow buffers or police the rate: losses arrive before a large queue does.
 
 **dgcc is bimodal.** dgcc had the highest p95 but the largest spread across tests (run std 67 vs 42 for CUBIC), because its tests split into two groups ([`results/runs.csv`](https://github.com/CS422-Networks-Group/HW3/blob/hw3-cleanup/results/runs.csv)). Of the 15 dgcc tests:
 
@@ -336,9 +277,8 @@ Percentiles use pandas' default linear interpolation between closest ranks (nump
 
 **RTT differences between algorithms were small.** Mean srtt differed by at most 5 ms between algorithms, which is less than the spread between repetitions of the same algorithm. On these paths no algorithm built a large standing queue, and the main RTT effect was BBR's occasional probing spikes. dgcc's goal of low delay was met, at a median queueing delay of 1.7 ms. But CUBIC and Reno had similar delays here, so these paths could not show the advantage the design targets (deep-buffer bottlenecks, where CUBIC would fill the buffer).
 
-**What we would change.** First, end start-up only after two consecutive rounds above the threshold, and use the round's *minimum* RTT rather than srtt for the test. Second, grow cwnd only when the connection is window-limited (the kernel's `tcp_is_cwnd_limited()`), which prevents the start-up overshoot.
-
 **Caveats.**
+
 - 15 tests per algorithm over 5 public paths is a small sample, and the paths changed between repetitions: CUBIC's and Reno's mean goodput varied by up to 2.3× between repetitions at the same destination.
 - Tests ran one after another, not at the same time, so the algorithms never competed for the same bottleneck.
 - 10 s is short relative to the RTT: 90 rounds, of which start-up takes about 10.
@@ -357,6 +297,7 @@ Percentiles use pandas' default linear interpolation between closest ranks (nump
 ## AI use
 
 Claude Code (Claude Opus) was used to:
+
 - write the eBPF implementation from our pseudocode;
 - extend the HW2 client for four algorithms, repetitions, and aggregate statistics;
 - run the experiments;
