@@ -105,12 +105,12 @@ Initial state ([`dgcc_init`](https://github.com/CS422-Networks-Group/HW3/blob/hw
 
 The pseudocode left "large", "noticeable", "a few", "a percentage", and the target unspecified; the parameters above fill them in. Other changes:
 
-1. Start-up grows cwnd on every ACK instead of doubling it at the end of a round.
-2. After any decrease, the next round makes no decision, so one congestion event does not cause repeated cuts.
-3. A loss the kernel later marks spurious is undone ([`dgcc_undo_cwnd`](https://github.com/CS422-Networks-Group/HW3/blob/hw3-cleanup/bpf/dgcc.bpf.c#L133-L145)).
-4. The 2 × BDP cap is not applied during start-up.
-5. dgcc sets the pacing rate ([L88–L102](https://github.com/CS422-Networks-Group/HW3/blob/hw3-cleanup/bpf/dgcc.bpf.c#L88-L102)), because `cong_control` replaces the kernel's pacing update.
-6. Timeouts are handled in `set_state` rather than in the per-round logic.
+1. Start-up adds to cwnd on every ACK instead of doubling it all at once at the end of a round. It still doubles each round, but avoids sending a big burst.
+2. After cwnd is cut, the next round makes no change. The smoothed RTT takes a while to drop after a cut, so without this one congestion event could cause several cuts.
+3. If the kernel later decides a lost packet was not really lost, [`dgcc_undo_cwnd`](https://github.com/CS422-Networks-Group/HW3/blob/hw3-cleanup/bpf/dgcc.bpf.c#L133-L145) puts cwnd back to what it was before the cut.
+4. The upper limit (twice what the path can hold) is not used during start-up, because it would stop the doubling too early.
+5. dgcc sets the pacing rate itself ([L88–L102](https://github.com/CS422-Networks-Group/HW3/blob/hw3-cleanup/bpf/dgcc.bpf.c#L88-L102)), since Linux does not do it for algorithms that control cwnd directly.
+6. Timeouts are handled as soon as the kernel detects them ([`dgcc_set_state`](https://github.com/CS422-Networks-Group/HW3/blob/hw3-cleanup/bpf/dgcc.bpf.c#L148-L163)), not at the end of a round.
 
 ## 3. Experiment
 
