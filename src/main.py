@@ -407,7 +407,7 @@ def plot_tcp_stats(d_data: pd.DataFrame, algorithm: str, out: str, duration: flo
     dest = d_data["destination"].iloc[0]
 
     #(i) time series: cwnd, rtt, loss proxy, goodput
-    fig, axes = plt.subplots(4, 1, figsize=(8, 10), sharex=True)
+    fig, axes = plt.subplots(4, 1, figsize=(8, 11), sharex=True)
     for rep, d in d_data.groupby("rep"):
         d = d.sort_values("time_s")
         t, color = d["time_s"], plt.cm.tab10(rep - 1)
@@ -421,10 +421,11 @@ def plot_tcp_stats(d_data: pd.DataFrame, algorithm: str, out: str, duration: flo
                                  "retransmitted\nsegments / interval", "goodput (Mbit/s)"]):
         ax.set_ylim(lims[field])
         ax.set_ylabel(label)
+        ax.set_xlabel("time (s)")
+        ax.tick_params(labelbottom=True)
         ax.grid(alpha=0.3)
     axes[0].legend(loc="upper right", fontsize=8)
     axes[3].set_xlim(lims["time_s"])
-    axes[3].set_xlabel("time (s)")
     fig.suptitle(f"TCP stats over time: {dest} ({algorithm})")
     fig.tight_layout()
     save(fig, out, f"tcp_stats_timeseries_{algorithm}")
