@@ -185,7 +185,15 @@ Over all samples from 5 destinations × 3 repetitions ([`results/aggregate.csv`]
 
 ### 4.3 Discussion
 
-**TODO:** explain the observed differences in throughput and RTT, using the tables above and Figures 1–2.
+| Metric | Meaning | Expected effect on goodput in congestion avoidance |
+| --- | --- | --- |
+| snd_cwnd | Max number of unacknowledged segments the sender can have in flight | Goodput ≈ cwnd × MSS / RTT until cwnd reaches the BDP. Past that, extra cwnd just fills the bottleneck queue. |
+| srtt | Smoothed RTT estimate | For a fixed cwnd, higher RTT means lower goodput. srtt rising above min_rtt means packets are queueing. |
+| Retransmitted segments | Our loss proxy | Each loss event makes our algorithm dynamically cut the cnwd based on the amount of extra delay.|
+
+On every path, packets were often lost (about 500 retransmitted segments per test) but rarely delayed by queueing,, so throughput depended mostly on how each algorithm adjusted cwnd based on loss. BBR does not slow down on loss (keeps the sending rate the same), so it had the highest throughput. Reno halves cwnd on each loss and regains only one segment per round trip, so it never recovered within the 10 s tests and had the lowest. With longer tests, Reno would likely have had time to rebuild cwnd and come closer to the others. CUBIC shrinks cnwd less and regrows faster, so it fell in between the algorithms. dgcc matched or beat CUBIC in 11 of 15 tests thanks to its smaller cut on random loss, but in the other 4 its start-up ended early and it grew too slowly to reach full speed, which lowered its average. RTT was similar for all four algorithms because most of it is the travel time to the server (about 110 ms), which no algorithm can change. An algorithm only adds delay by building a queue, and every algorithm’s queueing delay stayed small (1–2 ms median). BBR’s slightly higher average comes mostly from one test where its RTT spiked above 1 s before the connection timed out.
+
+It’s important to note that this could change if queueing delay became larger, because the algorithms have different ways of adjusting cwnd. For example, our algorithm adjusts cwnd based on how much queueing delay there is (larger queueing delay results in a larger decrease of cwnd).
 
 ## AI use
 
